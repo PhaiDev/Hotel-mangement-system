@@ -382,15 +382,13 @@ export default function BookingsPage() {
             <button
               key={t.id}
               onClick={() => setStatusFilter(t.id)}
-              className={`py-4 px-4 text-[13px] whitespace-nowrap border-b-2 -mb-[px] transition-all flex items-center gap-2.5 ${
-                statusFilter === t.id ? 'border-[#c9440f] text-[#c9440f] font-bold' : 'border-transparent text-[#8a8780] hover:text-[#1a1916]'
-              }`}
+              className={`py-4 px-4 text-[13px] whitespace-nowrap border-b-2 -mb-[px] transition-all flex items-center gap-2.5 ${statusFilter === t.id ? 'border-[#c9440f] text-[#c9440f] font-bold' : 'border-transparent text-[#8a8780] hover:text-[#1a1916]'
+                }`}
             >
               {t.label}
               {t.count > 0 && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${
-                  statusFilter === t.id ? 'bg-[#c9440f] text-white' : 'bg-[#e2e0d8] text-[#8a8780]'
-                }`}>{t.count}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${statusFilter === t.id ? 'bg-[#c9440f] text-white' : 'bg-[#e2e0d8] text-[#8a8780]'
+                  }`}>{t.count}</span>
               )}
             </button>
           ))}
@@ -441,7 +439,7 @@ export default function BookingsPage() {
                   </div>
                   <div className="font-bold text-[16px] text-[#1a1916]">{getRoomName(b.roomId)}</div>
                 </div>
-                
+
                 <div className="flex items-center justify-between border-t border-[#f0f0f0] pt-3 mt-1">
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase font-bold tracking-widest text-[#8a8780] mb-1">Check-in</span>
@@ -457,13 +455,13 @@ export default function BookingsPage() {
 
               {/* Card Actions: Primary Buttons */}
               <div className="flex items-center gap-2 pt-2">
-                <button 
+                <button
                   onClick={() => onViewDetail(b)}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#eaf0fb] text-[#1a4fa0] text-[13px] font-bold hover:bg-[#dce6f7] transition-all active:scale-95"
                 >
                   <Eye className="w-4 h-4" /> ดูรายละเอียด
                 </button>
-                
+
                 <div className="flex gap-2">
                   <button onClick={() => onEditBooking(b)} className="p-2.5 rounded-xl border border-[#fdf3d0] bg-[#fdf8e7] text-[#b58a00] hover:bg-[#fcf1c5] transition-all active:scale-95" title="แก้ไข">
                     <Pencil className="w-4 h-4" />
