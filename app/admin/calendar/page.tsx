@@ -138,6 +138,7 @@ export default function CalendarPage() {
         booking,
         availableUntil,
         guestName: booking?.customerName || null,
+        guestContact: booking?.customerLine || null,
       };
     });
   };
@@ -359,7 +360,12 @@ export default function CalendarPage() {
                     </div>
                     <div className={`text-[11px] mt-0.5 ${room.isBooked ? 'text-[#dc2626]' : 'text-[#1a7a4a]'}`}>
                       {room.isBooked
-                        ? `🔒 ${room.guestName || 'มีผู้จอง'}`
+                        ? (
+                          <div className="flex flex-col">
+                            <span>🔒 {room.guestName || 'มีผู้จอง'}</span>
+                            {room.guestContact && <span className="opacity-80 ml-4">📞 {room.guestContact}</span>}
+                          </div>
+                        )
                         : room.availableUntil === 'ว่างตลอดเดือนนี้'
                           ? '✓ ว่างตลอดเดือนนี้'
                           : `✓ ว่างถึง ${room.availableUntil}`

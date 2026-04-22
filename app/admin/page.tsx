@@ -167,6 +167,8 @@ export default function DashboardPage() {
           <div style="display:grid; grid-template-columns: 120px 1fr; gap: 4px 12px;">
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ผู้เข้าพัก</span>
             <span style="font-weight:500;">${b.customerName || '—'}</span>
+            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เบอร์โทร/LINE</span>
+            <span>${b.customerLine || '—'}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ห้องพัก</span>
             <span>${getRoomName(b.roomId)}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เช็คอิน</span>
@@ -276,17 +278,25 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 p-4">
           {rooms.map(r => {
-            const occupied = isRoomOccupied(r.id);
+            const occupiedBooking = bookings.find(b => b.roomId === r.id && b.status === 'ACTIVE');
+            const occupied = !!occupiedBooking;
             return (
-              <div key={r.id} className={`rounded-lg p-3 text-center border transition-colors ${occupied
-                  ? 'bg-[#c9440f]/5 border-[#c9440f]/20 text-[#c9440f]'
-                  : r.isActive
-                    ? 'bg-[#eaf5ef] border-[#1a7a4a]/20 text-[#1a7a4a]'
-                    : 'bg-[#fafaf8] border-[#e2e0d8] text-[#8a8780]'
+              <div key={r.id} className={`rounded-lg p-2 text-center border transition-all flex flex-col justify-center min-h-[64px] ${occupied
+                ? 'bg-[#c9440f]/5 border-[#c9440f]/20 text-[#c9440f]'
+                : r.isActive
+                  ? 'bg-[#eaf5ef] border-[#1a7a4a]/20 text-[#1a7a4a]'
+                  : 'bg-[#fafaf8] border-[#e2e0d8] text-[#8a8780]'
                 }`}>
-                <div className="font-mono text-[14px] font-medium">{r.name}</div>
-                <div className="text-[10px] mt-0.5 opacity-70">
-                  {occupied ? 'มีผู้พัก' : r.isActive ? 'ว่าง' : 'ระงับ'}
+                <div className="font-mono text-[13px] font-bold">{r.name}</div>
+                <div className="text-[9px] mt-0.5 font-medium truncate">
+                  {occupied
+                    ? (
+                      <div className="flex flex-col leading-tight">
+                        <span className="truncate">{occupiedBooking.customerName}</span>
+                        {occupiedBooking.customerLine && <span className="opacity-70 truncate text-[8px]">{occupiedBooking.customerLine}</span>}
+                      </div>
+                    )
+                    : r.isActive ? 'ว่าง' : 'ระงับ'}
                 </div>
               </div>
             );
