@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { backend, Room, Booking, BookingStatus } from '@/lib/supabase';
 import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import Swal from 'sweetalert2';
@@ -55,6 +55,16 @@ export default function BookingsPage() {
     } catch { return isoString; }
   };
 
+  const formatShortDate = (isoString?: string) => {
+    if (!isoString) return '—';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '—';
+      const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      return `${d.getDate()} ${months[d.getMonth()]}`;
+    } catch { return isoString; }
+  };
+
   const toInputDate = (isoString?: string) => {
     if (!isoString) return '';
     try {
@@ -64,11 +74,11 @@ export default function BookingsPage() {
 
   const statusBadge = (s: BookingStatus) => {
     const statusMap: Record<BookingStatus, React.ReactNode> = {
-      'PENDING': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono bg-[#fdf8e7] text-[#b58a00]">⏳ รอชำระ</span>,
-      'PAID': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono bg-[#eaf0fb] text-[#1a4fa0]">฿ ชำระแล้ว</span>,
-      'ACTIVE': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono bg-[#eaf5ef] text-[#1a7a4a]">🏠 เข้าพัก</span>,
-      'COMPLETED': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono bg-[#eaf5ef] text-[#1a7a4a]">✓ เช็คเอาท์</span>,
-      'CANCELLED': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono bg-[#fafaf8] text-[#8a8780]">✕ ยกเลิก</span>,
+      'PENDING': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold font-mono bg-[#fdf8e7] text-[#b58a00] border border-[#fdf3d0]">⏳ รอชำระ</span>,
+      'PAID': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold font-mono bg-[#eaf0fb] text-[#1a4fa0] border border-[#e2eaf8]">฿ ชำระแล้ว</span>,
+      'ACTIVE': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold font-mono bg-[#eaf5ef] text-[#1a7a4a] border border-[#dcf0e5]">🏠 เข้าพัก</span>,
+      'COMPLETED': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold font-mono bg-[#eaf5ef] text-[#1a7a4a] border border-[#dcf0e5]">✓ เช็คเอาท์</span>,
+      'CANCELLED': <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold font-mono bg-[#fafaf8] text-[#8a8780] border border-[#e2e0d8]">✕ ยกเลิก</span>,
     };
     return statusMap[s] || <span className="px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-600">{s}</span>;
   };
@@ -90,19 +100,19 @@ export default function BookingsPage() {
         <div style="text-align:left; font-size:13px; line-height:2.2;">
           <div style="display:grid; grid-template-columns: 120px 1fr; gap: 4px 12px;">
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ผู้เข้าพัก</span>
-            <span style="font-weight:500;">${b.customerName || '—'}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">LINE</span>
+            <span style="font-weight:700;">${b.customerName || '—'}</span>
+            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เบอร์โทร</span>
             <span>${b.customerLine || '—'}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ห้องพัก</span>
-            <span>${getRoomName(b.roomId)}</span>
+            <span style="font-weight:700;">${getRoomName(b.roomId)}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เช็คอิน</span>
             <span style="font-family:monospace;">${formatDate(b.checkIn)}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เช็คเอาท์</span>
             <span style="font-family:monospace;">${formatDate(b.checkOut)}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ยอดเงิน</span>
-            <span style="font-family:monospace; color:#c9440f; font-weight:600;">฿${Number(b.totalPrice || 0).toLocaleString()}</span>
+            <span style="font-family:monospace; color:#c9440f; font-weight:700;">฿${Number(b.totalPrice || 0).toLocaleString()}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">PIN</span>
-            <span style="font-family:monospace;">${b.pinCode || '—'}</span>
+            <span style="font-family:monospace; font-weight:700;">${b.pinCode || '—'}</span>
             <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">สร้างเมื่อ</span>
             <span style="font-family:monospace; font-size:12px;">${formatDate(b.createdAt)}</span>
           </div>
@@ -131,8 +141,8 @@ export default function BookingsPage() {
           <label class="swal-form-label">ชื่อผู้เข้าพัก</label>
           <input id="swal-name" class="swal-form-input" value="${b.customerName || ''}" placeholder="ชื่อผู้เข้าพัก">
 
-          <label class="swal-form-label">LINE ID</label>
-          <input id="swal-line" class="swal-form-input" value="${b.customerLine || ''}" placeholder="@line_id">
+          <label class="swal-form-label">LINE / เบอร์โทร</label>
+          <input id="swal-line" class="swal-form-input" value="${b.customerLine || ''}" placeholder="081-xxx-xxxx">
 
           <div class="swal-form-row">
             <div>
@@ -229,11 +239,11 @@ export default function BookingsPage() {
   // ===== CHANGE STATUS =====
   const onChangeStatus = async (b: Booking) => {
     const statusOptions = [
-      { value: 'PENDING', label: '⏳ รอชำระเงิน', color: '#b58a00' },
-      { value: 'PAID', label: '฿ ชำระแล้ว', color: '#1a4fa0' },
-      { value: 'ACTIVE', label: '🏠 เข้าพัก', color: '#1a7a4a' },
-      { value: 'COMPLETED', label: '✓ เช็คเอาท์', color: '#1a7a4a' },
-      { value: 'CANCELLED', label: '✕ ยกเลิก', color: '#8a8780' },
+      { value: 'PENDING', label: '⏳ รอชำระเงิน' },
+      { value: 'PAID', label: '฿ ชำระแล้ว' },
+      { value: 'ACTIVE', label: '🏠 เข้าพัก' },
+      { value: 'COMPLETED', label: '✓ เช็คเอาท์' },
+      { value: 'CANCELLED', label: '✕ ยกเลิก' },
     ];
 
     const { value: status } = await SwalStyled.fire({
@@ -258,17 +268,13 @@ export default function BookingsPage() {
     }
   };
 
-
-
   // ===== CREATE BOOKING =====
   const onCreateBooking = async () => {
-    let now = new Date()
-    const checkInDefult = now.toISOString().split('T')[0];
+    const now = new Date();
+    const checkInDefault = now.toISOString().split('T')[0];
     now.setDate(now.getDate() + 1);
-    const checkOutDefult = now.toISOString().split('T')[0];
+    const checkOutDefault = now.toISOString().split('T')[0];
     const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-
-    const priceDefult = 500;
 
     const { value: formValues } = await SwalStyled.fire({
       title: '➕ สร้างการจองใหม่',
@@ -277,8 +283,8 @@ export default function BookingsPage() {
           <label class="swal-form-label">ชื่อผู้เข้าพัก *</label>
           <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล">
 
-          <label class="swal-form-label">LINE ID</label>
-          <input id="swal-line" class="swal-form-input" placeholder="@line_id">
+          <label class="swal-form-label">เบอร์โทร / LINE</label>
+          <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
 
           <label class="swal-form-label">ห้องพัก *</label>
           <select id="swal-room" class="swal-form-select">
@@ -289,16 +295,16 @@ export default function BookingsPage() {
           <div class="swal-form-row">
             <div>
               <label class="swal-form-label">เช็คอิน *</label>
-              <input id="swal-checkin" type="date" value=${checkInDefult} class="swal-form-input">
+              <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
             </div>
             <div>
               <label class="swal-form-label">เช็คเอาท์ *</label>
-              <input id="swal-checkout" type="date" value=${checkOutDefult} class="swal-form-input">
+              <input id="swal-checkout" type="date" value="${checkOutDefault}" class="swal-form-input">
             </div>
           </div>
 
           <label class="swal-form-label">ยอดเงิน (฿)</label>
-          <input id="swal-price" type="number" value=${priceDefult} class="swal-form-input" placeholder="0">
+          <input id="swal-price" type="number" value="500" class="swal-form-input">
         </div>
       `,
       focusConfirm: false,
@@ -313,7 +319,7 @@ export default function BookingsPage() {
         const checkOut = (document.getElementById('swal-checkout') as HTMLInputElement).value;
         if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
         if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-        if (!checkIn || !checkOut) { Swal.showValidationMessage('กรุณาเลือกวันเช็คอิน/เช็คเอาท์'); return false; }
+        if (!checkIn || !checkOut) { Swal.showValidationMessage('กรุณาเลือกวันที่'); return false; }
         return {
           customerName: name,
           customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
@@ -349,126 +355,143 @@ export default function BookingsPage() {
     <div className="py-20 flex justify-center text-[#8a8780]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
-        <span className="text-[13px] font-mono">กำลังโหลดข้อมูลรายการจอง...</span>
+        <span className="text-[13px] font-mono font-bold">กำลังโหลดข้อมูลรายการจอง...</span>
       </div>
     </div>
   );
 
   return (
-    <div className="animate-in fade-in duration-300">
-      <div className="bg-white border border-[#e2e0d8] rounded-lg mb-5 overflow-hidden shadow-sm">
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-[#e2e0d8] flex items-center justify-between">
-          <div className="text-[13px] font-semibold tracking-[0.3px]">รายการจองทั้งหมด</div>
+    <div className="animate-in fade-in duration-500">
+      <div className="bg-white border border-[#e2e0d8] rounded-2xl overflow-hidden shadow-sm">
+        {/* Top Header */}
+        <div className="p-4 sm:p-6 border-b border-[#e2e0d8] flex items-center justify-between">
+          <div className="text-[16px] font-bold tracking-tight text-[#1a1916]">รายการจองห้องพัก</div>
           <div className="flex items-center gap-2">
-            <button onClick={fetchData} className="p-1.5 rounded-md border border-[#d0cdc2] text-[#8a8780] hover:bg-[#f5f4f0] transition-colors" title="รีเฟรช">
-              <RefreshCw className="w-3.5 h-3.5" />
+            <button onClick={fetchData} className="p-2.5 rounded-xl border border-[#e2e0d8] text-[#8a8780] hover:bg-[#fafaf8] transition-all active:scale-95">
+              <RefreshCw className="w-4 h-4" />
             </button>
-            <button onClick={onCreateBooking} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#c9440f] text-white text-[12px] font-medium hover:bg-[#e04d12] transition-colors">
-              <Plus className="w-3.5 h-3.5" /> เพิ่มการจอง
+            <button onClick={onCreateBooking} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20">
+              <Plus className="w-4 h-4" /> เพิ่มการจอง
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-[#e2e0d8] px-5 overflow-x-auto">
+        {/* Status Filters */}
+        <div className="flex overflow-x-auto no-scrollbar border-b border-[#e2e0d8] px-4 bg-[#fafaf8]">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setStatusFilter(t.id)}
-              className={`py-3 px-4 text-[13px] whitespace-nowrap border-b-2 -mb-[1px] transition-colors flex items-center gap-1.5 ${statusFilter === t.id
-                ? 'border-[#c9440f] text-[#1a1916] font-medium'
-                : 'border-transparent text-[#8a8780] hover:text-[#1a1916]'
-                }`}
+              className={`py-4 px-4 text-[13px] whitespace-nowrap border-b-2 -mb-[px] transition-all flex items-center gap-2.5 ${
+                statusFilter === t.id ? 'border-[#c9440f] text-[#c9440f] font-bold' : 'border-transparent text-[#8a8780] hover:text-[#1a1916]'
+              }`}
             >
               {t.label}
               {t.count > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${statusFilter === t.id ? 'bg-[#c9440f]/10 text-[#c9440f]' : 'bg-[#f5f4f0] text-[#8a8780]'
-                  }`}>{t.count}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm ${
+                  statusFilter === t.id ? 'bg-[#c9440f] text-white' : 'bg-[#e2e0d8] text-[#8a8780]'
+                }`}>{t.count}</span>
               )}
             </button>
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2.5 p-3.5 px-4 border-b border-[#e2e0d8] bg-[#fafaf8]">
-          <div className="relative flex-1 min-w-[160px]">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8a8780]" />
+        {/* Global Filter Bar */}
+        <div className="p-4 border-b border-[#e2e0d8] flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8a8780]" />
             <input
               type="text"
-              placeholder="ค้นหาชื่อผู้เข้าพัก..."
+              placeholder="ค้นหาตามชื่อผู้เข้าพัก..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full border border-[#d0cdc2] rounded-md pl-8 pr-3 py-1.5 text-[12px] outline-none focus:border-[#c9440f] bg-white transition-colors"
+              className="w-full border border-[#e2e0d8] rounded-xl pl-11 pr-4 py-2.5 text-[14px] outline-none focus:ring-4 focus:ring-[#c9440f]/5 focus:border-[#c9440f] bg-white transition-all shadow-sm"
             />
           </div>
           <select
-            className="border border-[#d0cdc2] rounded-md px-2.5 py-1.5 text-[12px] bg-white outline-none cursor-pointer"
+            className="border border-[#e2e0d8] rounded-xl px-4 py-2.5 text-[14px] outline-none bg-white font-medium cursor-pointer hover:bg-[#fafaf8] transition-all focus:border-[#c9440f]"
             value={roomFilter}
             onChange={(e) => setRoomFilter(e.target.value)}
           >
-            <option value="all">ทุกห้อง</option>
+            <option value="all">ทุกห้องพัก</option>
             {rooms.map(r => <option key={r.id} value={String(r.id)}>{r.name}</option>)}
           </select>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px] text-left border-collapse min-w-[900px]">
-            <thead>
-              <tr className="bg-[#fafaf8]">
-                <th className="py-2.5 px-4 text-[10px] font-semibold text-[#8a8780] uppercase tracking-[0.8px] border-b border-[#e2e0d8]">ผู้เข้าพัก</th>
-                <th className="py-2.5 px-4 text-[10px] font-semibold text-[#8a8780] uppercase tracking-[0.8px] border-b border-[#e2e0d8]">ห้อง</th>
-                <th className="py-2.5 px-4 text-[10px] font-semibold text-[#8a8780] uppercase tracking-[0.8px] border-b border-[#e2e0d8]">เช็คอิน / เอาท์</th>
-                <th className="py-2.5 px-4 text-[10px] font-semibold text-[#8a8780] uppercase tracking-[0.8px] border-b border-[#e2e0d8]">ยอด</th>
-                <th className="py-2.5 px-4 text-[10px] font-semibold text-[#8a8780] uppercase tracking-[0.8px] border-b border-[#e2e0d8]">สถานะ</th>
-                <th className="py-2.5 px-4 text-[10px] font-semibold text-[#8a8780] uppercase tracking-[0.8px] border-b border-[#e2e0d8] text-center">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((b, i) => (
-                <tr key={b.id} className="hover:bg-[#fafaf8] group transition-colors">
-                  <td className="py-3 px-4 border-b border-[#e2e0d8]">
-                    <div className="font-medium">{b.customerName || '-'}</div>
-                    {b.customerLine && <div className="text-[11px] text-[#8a8780] mt-0.5">{b.customerLine}</div>}
-                  </td>
-                  <td className="py-3 px-4 border-b border-[#e2e0d8] text-[#8a8780]">{getRoomName(b.roomId)}</td>
-                  <td className="py-3 px-4 border-b border-[#e2e0d8] font-mono text-[12px]">{formatDate(b.checkIn)} → {formatDate(b.checkOut)}</td>
-                  <td className="py-3 px-4 border-b border-[#e2e0d8] font-mono">{b.totalPrice != null ? `฿${Number(b.totalPrice).toLocaleString()}` : '—'}</td>
-                  <td className="py-3 px-4 border-b border-[#e2e0d8]">
-                    <button onClick={() => onChangeStatus(b)} className="hover:opacity-80 transition-opacity">
-                      {statusBadge(b.status)}
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 border-b border-[#e2e0d8]">
-                    <div className="flex items-center justify-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onViewDetail(b)} className="p-1.5 rounded-md hover:bg-[#eaf0fb] text-[#1a4fa0] transition-colors" title="ดูรายละเอียด">
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => onEditBooking(b)} className="p-1.5 rounded-md hover:bg-[#fdf8e7] text-[#b58a00] transition-colors" title="แก้ไข">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => onDeleteBooking(b)} className="p-1.5 rounded-md hover:bg-[#fef2f2] text-[#dc2626] transition-colors" title="ลบ">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center py-10 text-[#8a8780]">
-                  <div className="text-[28px] mb-2">📭</div>
-                  <div className="text-[13px]">ไม่มีรายการจองในหมวดหมู่นี้</div>
-                </td></tr>
-              )}
-            </tbody>
-          </table>
+        {/* THE REQUESTED BOX LAYOUT */}
+        <div className="p-4 sm:p-6 bg-[#fcfbf9] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filtered.map((b) => (
+            <div key={b.id} className="bg-white border border-[#e2e0d8] rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 group border-b-4 border-b-transparent hover:border-b-[#c9440f]">
+              {/* Card Header: Guest Details */}
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex flex-col min-w-0">
+                  <div className="font-bold text-[18px] text-[#1a1916] leading-tight mb-1 truncate">{b.customerName || 'ไม่ระบุชื่อ'}</div>
+                  <div className="text-[13px] text-[#8a8780] font-bold">{b.customerLine || 'ไม่มีข้อมูลเบอร์ติดต่อ'}</div>
+                </div>
+                <button onClick={() => onChangeStatus(b)} className="flex-shrink-0 active:scale-95 transition-transform">
+                  {statusBadge(b.status)}
+                </button>
+              </div>
+
+              {/* Card Info: Room and Booking Period */}
+              <div className="bg-[#fafafa] border border-[#f0f0f0] rounded-2xl p-4 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#1a1916] text-[#c9440f] flex items-center justify-center font-bold text-[15px] shadow-sm">
+                    {getRoomName(b.roomId).replace(/\D/g, '') || 'R'}
+                  </div>
+                  <div className="font-bold text-[16px] text-[#1a1916]">{getRoomName(b.roomId)}</div>
+                </div>
+                
+                <div className="flex items-center justify-between border-t border-[#f0f0f0] pt-3 mt-1">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-[#8a8780] mb-1">Check-in</span>
+                    <span className="font-mono font-bold text-[14px] text-[#1a1916]">{formatShortDate(b.checkIn)}</span>
+                  </div>
+                  <div className="text-[#e2e0d8] font-light text-[20px]">→</div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-[#8a8780] mb-1">Check-out</span>
+                    <span className="font-mono font-bold text-[14px] text-[#1a1916]">{formatShortDate(b.checkOut)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Actions: Primary Buttons */}
+              <div className="flex items-center gap-2 pt-2">
+                <button 
+                  onClick={() => onViewDetail(b)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#eaf0fb] text-[#1a4fa0] text-[13px] font-bold hover:bg-[#dce6f7] transition-all active:scale-95"
+                >
+                  <Eye className="w-4 h-4" /> ดูรายละเอียด
+                </button>
+                
+                <div className="flex gap-2">
+                  <button onClick={() => onEditBooking(b)} className="p-2.5 rounded-xl border border-[#fdf3d0] bg-[#fdf8e7] text-[#b58a00] hover:bg-[#fcf1c5] transition-all active:scale-95" title="แก้ไข">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => onDeleteBooking(b)} className="p-2.5 rounded-xl border border-[#fee2e2] bg-[#fef2f2] text-[#dc2626] hover:bg-[#fde2e2] transition-all active:scale-95" title="ลบ">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Empty Display */}
+          {filtered.length === 0 && (
+            <div className="col-span-full py-24 flex flex-col items-center justify-center bg-white border border-[#e2e0d8] border-dashed rounded-[32px]">
+              <div className="text-[64px] mb-4 grayscale opacity-20">📭</div>
+              <div className="text-[15px] text-[#8a8780] font-bold">ไม่พบรายการห้องพักที่จองในช่วงนี้</div>
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 bg-[#fafaf8] border-t border-[#e2e0d8] text-[11px] text-[#8a8780] flex items-center justify-between">
-          <span>แสดง {filtered.length} จาก {bookings.length} รายการ</span>
-          <span className="font-mono">รายได้รวม: ฿{filtered.reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0).toLocaleString()}</span>
+        {/* Page Footer: Summary Statistics */}
+        <div className="p-5 bg-white border-t border-[#e2e0d8] flex flex-col sm:flex-row items-center justify-between gap-5 text-[14px]">
+          <div className="text-[#8a8780] font-medium">แสดง <span className="font-bold text-[#1a1916]">{filtered.length}</span> จากทั้งหมด <span className="font-bold text-[#1a1916]">{bookings.length}</span> รายการ</div>
+          <div className="flex items-center gap-3 bg-[#fafaf8] px-6 py-3 rounded-2xl border border-[#e2e0d8] shadow-inner">
+            <span className="text-[#8a8780] font-bold">ยอดรายได้รวมส่วนนี้:</span>
+            <span className="font-mono font-extrabold text-[#c9440f] text-[18px]">฿{filtered.reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0).toLocaleString()}</span>
+          </div>
         </div>
       </div>
     </div>
