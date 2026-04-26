@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -31,7 +32,9 @@ export default function RootLayout({
     <html lang="th">
       <body className={`${inter.className} bg-gray-950 text-white selection:bg-[#f59e0b]/30`}>
         <main className="min-h-screen relative overflow-x-hidden">
-          {children}
+          <Providers>
+            {children}
+          </Providers>
         </main>
       </body>
     </html>

@@ -137,7 +137,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <main className="flex-1 lg:ml-[220px] min-w-0 flex flex-col min-h-screen">
-        <div className="bg-white border-b border-[#e2e0d8] px-6 py-2.5 flex items-center justify-between sticky top-0 z-30">
+        <div className="bg-white border-b border-[#e2e0d8] px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -161,7 +161,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
 
-        <div className="p-4 sm:p-7 flex-1">
+        <div className="p-3 sm:p-6 lg:p-7 flex-1">
           {children}
         </div>
       </main>

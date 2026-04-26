@@ -6,41 +6,29 @@ import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { Pencil, Trash2, Eye, RefreshCw, Plus, Search } from 'lucide-react';
+import useSWR from 'swr';
 
 const MySwal = withReactContent(Swal);
 
 export default function BookingsPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
+  const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
+  const loading = loadingRooms || loadingBookings;
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [fetchedRooms, fetchedBookings] = await Promise.all([
-        backend.getRooms(),
-        backend.getBookings(),
-      ]);
-      setRooms(fetchedRooms || []);
-      setBookings(fetchedBookings || []);
-    } catch (err: any) {
-      SwalStyled.fire('โหลดข้อมูลล้มเหลว', err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([mutateRooms(), mutateBookings()]);
   };
 
   useEffect(() => {
-    fetchData();
     // Inject swal CSS
     const style = document.createElement('style');
     style.textContent = swalCSS;
     document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
+    return () => { if (document.head.contains(style)) document.head.removeChild(style); };
   }, []);
 
   const formatDate = (isoString?: string) => {
@@ -94,27 +82,58 @@ export default function BookingsPage() {
 
   // ===== VIEW BOOKING DETAIL =====
   const onViewDetail = (b: Booking) => {
+    const room = rooms.find(r => r.id === b.roomId);
+    const pinCode = room ? room.pinLock : null;
     SwalStyled.fire({
       title: '📋 รายละเอียดการจอง',
       html: `
-        <div style="text-align:left; font-size:13px; line-height:2.2;">
-          <div style="display:grid; grid-template-columns: 120px 1fr; gap: 4px 12px;">
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ผู้เข้าพัก</span>
-            <span style="font-weight:700;">${b.customerName || '—'}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เบอร์โทร</span>
-            <span>${b.customerLine || '—'}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ห้องพัก</span>
-            <span style="font-weight:700;">${getRoomName(b.roomId)}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เช็คอิน</span>
-            <span style="font-family:monospace;">${formatDate(b.checkIn)}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">เช็คเอาท์</span>
-            <span style="font-family:monospace;">${formatDate(b.checkOut)}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">ยอดเงิน</span>
-            <span style="font-family:monospace; color:#c9440f; font-weight:700;">฿${Number(b.totalPrice || 0).toLocaleString()}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">PIN</span>
-            <span style="font-family:monospace; font-weight:700;">${b.pinCode || '—'}</span>
-            <span style="color:rgba(240,236,232,0.4); font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">สร้างเมื่อ</span>
-            <span style="font-family:monospace; font-size:12px;">${formatDate(b.createdAt)}</span>
+        <div class="text-left font-sans mt-2">
+          <div class="mb-4">
+            <div class="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> ข้อมูลผู้เข้าพัก</div>
+            <div class="border border-[#e2e0d8] rounded-xl overflow-hidden bg-white">
+              <div class="px-4 py-3 border-b border-[#e2e0d8]">
+                <div class="text-[10px] text-[#8a8780] mb-0.5">ชื่อ-นามสกุล / Name</div>
+                <div class="font-bold text-[14px] text-[#1a1916]">${b.customerName || '—'}</div>
+              </div>
+              <div class="px-4 py-3">
+                <div class="text-[10px] text-[#8a8780] mb-0.5">เบอร์โทร / LINE ID</div>
+                <div class="font-bold font-mono text-[13px] text-[#1a1916]">${b.customerLine || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-5">
+            <div class="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg> รายละเอียดการเข้าพัก</div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="border border-[#e2e0d8] rounded-xl px-4 py-3 bg-white">
+                <div class="text-[10px] text-[#8a8780] mb-0.5">ห้องพัก / Room</div>
+                <div class="font-bold text-[16px] text-[#1a1916] leading-tight mt-1">${getRoomName(b.roomId)}</div>
+              </div>
+              <div class="border border-[#e2e0d8] rounded-xl px-4 py-3 bg-white">
+                <div class="text-[10px] text-[#8a8780] mb-0.5">วันที่ / Dates</div>
+                <div class="font-bold font-mono text-[13px] text-[#1a1916] mt-0.5">${formatDate(b.checkIn)}</div>
+                <div class="text-[10px] text-[#8a8780] mt-0.5">ถึง ${formatDate(b.checkOut)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-5 grid grid-cols-2 gap-3">
+             <div class="border border-[#e2e0d8] rounded-xl px-4 py-2 bg-white flex flex-col justify-center">
+                <div class="text-[10px] text-[#8a8780] mb-0.5">สถานะ / Status</div>
+                <div class="font-bold text-[12px] text-[#1a1916] ">${b.status}</div>
+             </div>
+             <div class="border border-[#e2e0d8] rounded-xl px-4 py-2 bg-white flex flex-col justify-center">
+                <div class="text-[10px] text-[#8a8780] mb-0.5">รหัส PIN</div>
+                <div class="font-bold font-mono text-[13px] text-[#1a1916]">${pinCode || '—'}</div>
+             </div>
+          </div>
+
+          <div class="bg-[#1a1916] rounded-xl p-5 flex items-center justify-between text-white shadow-md">
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+              <span class="text-[13px] font-medium text-white/80">ยอดสุทธิ (Total)</span>
+            </div>
+            <div class="font-mono text-[26px] font-bold text-[#e88c2a]">฿${Number(b.totalPrice || 0).toLocaleString()}</div>
           </div>
         </div>
       `,
@@ -351,7 +370,7 @@ export default function BookingsPage() {
     { id: 'CANCELLED', label: 'ยกเลิก', count: bookings.filter(b => b.status === 'CANCELLED').length },
   ];
 
-  if (loading) return (
+  if (loading && bookings.length === 0) return (
     <div className="py-20 flex justify-center text-[#8a8780]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />

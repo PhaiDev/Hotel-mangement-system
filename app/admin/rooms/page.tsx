@@ -5,43 +5,31 @@ import { backend, Room, Booking } from '@/lib/supabase';
 import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import { Pencil, Trash2, Plus, RefreshCw, Key, Users, Lock, Power } from 'lucide-react';
+import { Pencil, Trash2, Plus, RefreshCw, Key, Users, Lock, Power, LogOut, Info } from 'lucide-react';
+import useSWR from 'swr';
 
 const MySwal = withReactContent(Swal);
 
 export default function RoomsPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
+  const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
+  const loading = loadingRooms || loadingBookings;
 
   const fetchRooms = async () => {
-    setLoading(true);
-    try {
-      const [fetchedRooms, fetchedBookings] = await Promise.all([
-        backend.getRooms(),
-        backend.getBookings(),
-      ]);
-      setRooms(fetchedRooms || []);
-      setBookings(fetchedBookings || []);
-    } catch (err: any) {
-      SwalStyled.fire('โหลดข้อมูลล้มเหลว', err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([mutateRooms(), mutateBookings()]);
   };
 
   useEffect(() => {
-    fetchRooms();
     const style = document.createElement('style');
     style.textContent = swalCSS;
     document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
+    return () => { if (document.head.contains(style)) document.head.removeChild(style); };
   }, []);
 
   const isRoomOccupied = (roomId: number) => {
     return bookings.some(b => b.roomId === roomId && b.status === 'ACTIVE');
   };
-  
+
   const getActiveBookingForRoom = (roomId: number) => {
     return bookings.find(b => b.roomId === roomId && b.status === 'ACTIVE');
   };
@@ -104,6 +92,10 @@ export default function RoomsPage() {
           <label class="swal-form-label">ชื่อห้อง</label>
           <input id="swal-name" class="swal-form-input" value="${room.name}" placeholder="เช่น Room 101">
 
+          <label class="swal-form-label">รหัสล็อคเกอร์ (Locker Box)</label>
+          <input id="swal-pinLock" class="swal-form-input" value="${room.pinLock}" placeholder="เช่น Room 101">
+          <div style="margin: 20px"></div>
+
           <div class="swal-form-row">
             <div>
               <label class="swal-form-label">ความจุ (ท่าน)</label>
@@ -129,6 +121,7 @@ export default function RoomsPage() {
         }
         return {
           name,
+          pinLock: (document.getElementById('swal-pinLock') as HTMLInputElement).value,
           capacity: Number((document.getElementById('swal-capacity') as HTMLInputElement).value) || 1,
           lockId: (document.getElementById('swal-lock') as HTMLInputElement).value,
         };
@@ -155,6 +148,9 @@ export default function RoomsPage() {
           <label class="swal-form-label">ชื่อห้อง *</label>
           <input id="swal-name" class="swal-form-input" placeholder="เช่น Room 201">
 
+          <label class="swal-form-label">รหัสล็อคเกอร์ (Locker Box)</label>
+          <input id="swal-pinLock" class="swal-form-input" placeholder="เช่น 1234">
+
           <div class="swal-form-row">
             <div>
               <label class="swal-form-label">ความจุ (ท่าน)</label>
@@ -180,6 +176,7 @@ export default function RoomsPage() {
         }
         return {
           name,
+          pinLock: (document.getElementById('swal-pinLock') as HTMLInputElement).value || '',
           capacity: Number((document.getElementById('swal-capacity') as HTMLInputElement).value) || 2,
           lockId: (document.getElementById('swal-lock') as HTMLInputElement).value || '',
           isActive: true,
@@ -191,6 +188,28 @@ export default function RoomsPage() {
       try {
         await backend.createRoom(formValues);
         SwalStyled.fire({ icon: 'success', title: 'สร้างสำเร็จ!', text: 'เพิ่มห้องพักใหม่เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
+        fetchRooms();
+      } catch (err: any) {
+        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      }
+    }
+  };
+
+  // ===== QUICK CHECKOUT =====
+  const onCheckOut = async (booking: Booking) => {
+    const result = await SwalStyled.fire({
+      title: '📤 ยืนยันการเช็คเอาท์?',
+      html: `<div style="font-size:13px;">ยืนยันการเช็คเอาท์ <strong>${booking.customerName}</strong> ใช่หรือไม่?</div>`,
+      showCancelButton: true,
+      confirmButtonText: 'เช็คเอาท์เลย',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#c9440f',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await backend.updateBookingStatus(booking.id, 'COMPLETED');
+        SwalStyled.fire({ icon: 'success', title: 'เช็คเอาท์สำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchRooms();
       } catch (err: any) {
         SwalStyled.fire('ล้มเหลว', err.message, 'error');
@@ -230,7 +249,43 @@ export default function RoomsPage() {
     }
   };
 
-  if (loading) return (
+  const getRoomName = (id: number) => rooms.find(r => r.id === id)?.name || id;
+  const formatDate = (d: string | Date) => new Date(d).toLocaleDateString('th-TH', { 
+    day: 'numeric', month: 'short', year: 'numeric' 
+  });
+
+  const onViewBooking = (b: Booking) => {
+    const room = rooms.find(r => r.id === b.roomId);
+    const pin = room?.pinLock || b.pinCode;
+    
+    SwalStyled.fire({
+      title: '📋 ข้อมูลการเข้าพัก',
+      html: `
+        <div class="text-left font-sans">
+          <div class="bg-[#1a1916]/5 rounded-xl p-4 mb-4 border border-[#1a1916]/10">
+            <div class="text-[10px] text-[#8a8780] uppercase tracking-wider mb-1">ผู้เข้าพัก / Guest</div>
+            <div class="font-bold text-[16px] text-[#1a1916]">${b.customerName}</div>
+            <div class="text-[12px] text-[#8a8780] mt-1">LINE: ${b.customerLine || '-'}</div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="border border-[#e2e0d8] rounded-xl p-3 bg-white">
+              <div class="text-[10px] text-[#8a8780] mb-0.5">วันที่เข้าพัก / Stay</div>
+              <div class="font-bold text-[13px] text-[#1a1916] leading-snug">${formatDate(b.checkIn)}</div>
+              <div class="text-[10px] text-[#8a8780]">ถึง ${formatDate(b.checkOut)}</div>
+            </div>
+             <div class="border border-[#e2e0d8] rounded-xl p-3 bg-white">
+              <div class="text-[10px] text-[#8a8780] mb-0.5">รหัส PIN / Locker</div>
+              <div class="font-mono font-bold text-[16px] text-[#c9440f]">${pin || '-'}</div>
+            </div>
+          </div>
+        </div>
+      `,
+      confirmButtonText: 'รับทราบ',
+      width: 400,
+    });
+  };
+
+  if (loading && rooms.length === 0) return (
     <div className="py-20 flex justify-center text-[#8a8780]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
@@ -277,18 +332,17 @@ export default function RoomsPage() {
             </button>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
           {rooms.map((r) => {
             const isOccupied = isRoomOccupied(r.id);
             const activeBooking = getActiveBookingForRoom(r.id);
             const isAvailable = !isOccupied && r.isActive;
-            
+
             return (
-              <div key={r.id} className={`border rounded-lg p-4 transition-all hover:shadow-md group bg-white ${
-                isOccupied ? 'border-l-[3px] border-l-[#c9440f] border-[#e2e0d8]' : 
+              <div key={r.id} className={`border rounded-lg p-4 transition-all hover:shadow-md group bg-white ${isOccupied ? 'border-l-[3px] border-l-[#c9440f] border-[#e2e0d8]' :
                 isAvailable ? 'border-l-[3px] border-l-[#1a7a4a] border-[#e2e0d8]' : 'border-l-[3px] border-l-[#8a8780] border-[#e2e0d8] opacity-70'
-              }`}>
+                }`}>
                 {/* Room Header */}
                 <div className="flex items-start justify-between mb-2">
                   <div>
@@ -303,7 +357,7 @@ export default function RoomsPage() {
                     </div>
                   </div>
                   {/* Action Buttons */}
-                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-0.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                     <button onClick={() => onEditRoom(r)} className="p-1.5 rounded-md hover:bg-[#fdf8e7] text-[#b58a00] transition-colors" title="แก้ไข">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
@@ -312,15 +366,15 @@ export default function RoomsPage() {
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Status */}
                 <div className={`text-[11px] font-medium mb-1 ${isOccupied ? 'text-[#c9440f]' : isAvailable ? 'text-[#1a7a4a]' : 'text-neutral-500'}`}>
                   {isOccupied ? `● มีผู้พัก (${activeBooking?.customerName})` : isAvailable ? '● ว่าง' : `● ระงับให้บริการ`}
                 </div>
-                
+
                 {/* PIN */}
                 {isOccupied && (
-                  <div 
+                  <div
                     onClick={() => activeBooking && onEditPin(activeBooking.id, activeBooking.pinCode)}
                     className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[#8a8780] mt-1 cursor-pointer hover:text-[#1a4fa0] transition-colors bg-[#fafaf8] px-2.5 py-1 rounded-md border border-[#e2e0d8]"
                   >
@@ -328,20 +382,38 @@ export default function RoomsPage() {
                     {activeBooking?.pinCode ? `PIN: ${activeBooking.pinCode}` : 'ตั้ง PIN'}
                   </div>
                 )}
-                
+
                 {/* Actions Footer */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#e2e0d8]">
-                  <button  
+                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#f0ece8]">
+                  <button
                     onClick={() => onToggleRoomActive(r.id, r.isActive)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-[12px] transition-colors ${
-                      r.isActive 
-                      ? 'border-[#1a7a4a]/20 bg-[#eaf5ef] text-[#1a7a4a] hover:bg-[#d4ede1]' 
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border text-[12px] font-medium transition-all ${r.isActive
+                      ? 'border-[#1a7a4a]/20 bg-[#eaf5ef] text-[#1a7a4a] hover:bg-[#d4ede1]'
                       : 'border-[#d0cdc2] bg-white text-[#8a8780] hover:bg-[#f5f4f0]'
-                    }`}
+                      }`}
                   >
-                    <Power className="w-3 h-3" />
+                    <Power className="w-3.5 h-3.5" />
                     {r.isActive ? 'เปิดอยู่' : 'ปิดอยู่'}
                   </button>
+                  
+                  {isOccupied && activeBooking && (
+                    <>
+                    <button 
+                      onClick={() => onViewBooking(activeBooking)}
+                      className="flex items-center justify-center p-2.5 rounded-lg border border-[#1a4fa0]/20 bg-[#eaf0fb] text-[#1a4fa0] hover:bg-[#d4e4fd] transition-all"
+                      title="ดูข้อมูลการเข้าพัก"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => onCheckOut(activeBooking)}
+                      className="flex items-center justify-center p-2.5 rounded-lg border border-[#c9440f]/20 bg-[#fdf5f2] text-[#c9440f] hover:bg-[#fce9e1] transition-all"
+                      title="เช็คเอาท์ทันที"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

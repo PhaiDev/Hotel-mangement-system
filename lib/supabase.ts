@@ -8,6 +8,7 @@ export interface Room {
   isActive: boolean;
   capacity: number;
   createdAt: string;
+  pinLock: string;
 }
 
 export type BookingStatus = 'PENDING' | 'PAID' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
@@ -110,7 +111,7 @@ export const backend = {
 
   updateBooking: async (id: number, payload: Partial<Omit<Booking, 'id' | 'createdAt'>>): Promise<Booking> => {
     const supabase = createClient();
-    
+
     // If dates or room are changing, check for overlap
     if (payload.checkIn || payload.checkOut || payload.roomId) {
       // Need current booking data if some fields are missing in payload

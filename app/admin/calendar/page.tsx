@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { backend, Room, Booking } from '@/lib/supabase';
 import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import { ChevronLeft, ChevronRight, Users, RefreshCw } from 'lucide-react';
+import useSWR from 'swr';
 
 const THAI_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -20,9 +21,9 @@ const toLocalDateStr = (date: Date): string => {
 };
 
 export default function CalendarPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
+  const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
+  const loading = loadingRooms || loadingBookings;
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -30,27 +31,14 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
   const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [fetchedRooms, fetchedBookings] = await Promise.all([
-        backend.getRooms(),
-        backend.getBookings(),
-      ]);
-      setRooms(fetchedRooms || []);
-      setBookings(fetchedBookings || []);
-    } catch (err: any) {
-      SwalStyled.fire('โหลดข้อมูลล้มเหลว', err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([mutateRooms(), mutateBookings()]);
   };
 
   useEffect(() => {
-    fetchData();
     const style = document.createElement('style');
     style.textContent = swalCSS;
     document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
+    return () => { if (document.head.contains(style)) document.head.removeChild(style); };
   }, []);
 
   // Get all days in the current month view
@@ -185,7 +173,7 @@ export default function CalendarPage() {
   const selectedAvailability = getDateAvailability(selectedDate);
   const selectedRooms = getAvailableRoomsForDate(selectedDate);
 
-  if (loading) return (
+  if (loading && rooms.length === 0) return (
     <div className="py-20 flex justify-center text-[#8a8780]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />

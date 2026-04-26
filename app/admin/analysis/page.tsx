@@ -16,6 +16,7 @@ import {
   Filler,
 } from 'chart.js';
 import { RefreshCw, TrendingUp, Users, DollarSign, Activity } from 'lucide-react';
+import useSWR from 'swr';
 
 ChartJS.register(
   CategoryScale,
@@ -30,29 +31,13 @@ ChartJS.register(
 );
 
 export default function AnalysisPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
+  const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
+  const loading = loadingRooms || loadingBookings;
 
   const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [fetchedRooms, fetchedBookings] = await Promise.all([
-        backend.getRooms(),
-        backend.getBookings(),
-      ]);
-      setRooms(fetchedRooms || []);
-      setBookings(fetchedBookings || []);
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([mutateRooms(), mutateBookings()]);
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   // --- Real Stats Calculation ---
   const stats = useMemo(() => {
@@ -141,7 +126,7 @@ export default function AnalysisPage() {
     }
   };
 
-  if (loading) return (
+  if (loading && rooms.length === 0) return (
     <div className="py-20 flex justify-center text-[#8a8780]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
