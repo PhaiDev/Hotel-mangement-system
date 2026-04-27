@@ -56,7 +56,7 @@ export default function BookingsPage() {
   const toInputDate = (isoString?: string) => {
     if (!isoString) return '';
     try {
-      return new Date(isoString).toISOString().split('T')[0];
+      return isoString.split('T')[0]
     } catch { return ''; }
   };
 
@@ -293,6 +293,7 @@ export default function BookingsPage() {
     const checkInDefault = now.toISOString().split('T')[0];
     now.setDate(now.getDate() + 1);
     const checkOutDefault = now.toISOString().split('T')[0];
+    const defultNight = 1;
     const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 
     const { value: formValues } = await SwalStyled.fire({
@@ -317,13 +318,15 @@ export default function BookingsPage() {
               <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
             </div>
             <div>
-              <label class="swal-form-label">เช็คเอาท์ *</label>
-              <input id="swal-checkout" type="date" value="${checkOutDefault}" class="swal-form-input">
+              <label class="swal-form-label">จำนวนคืน *</label>
+              <input id="swal-checkout" type="number" value="${defultNight}" min="1" class="swal-form-input">
             </div>
           </div>
 
-          <label class="swal-form-label">ยอดเงิน (฿)</label>
-          <input id="swal-price" type="number" value="500" class="swal-form-input">
+          <div style="margin-top: 20px; padding: 12px 16px; background: #fafaf8; border-radius: 12px; border: 1px solid #e2e0d8; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 12px; color: #8a8780; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">ยอดรวม (Total Price)</div>
+            <div id="price-display" style="font-size: 22px; font-weight: 800; color: #c9440f;">฿${defultNight * 500}</div>
+          </div>
         </div>
       `,
       focusConfirm: false,
@@ -331,21 +334,36 @@ export default function BookingsPage() {
       confirmButtonText: '✨ สร้างการจอง',
       cancelButtonText: 'ยกเลิก',
       width: 520,
+      didOpen: () => {
+        const nightInput = document.getElementById('swal-checkout') as HTMLInputElement;
+        const priceDisplay = document.getElementById('price-display') as HTMLElement;
+        const calculate = () => {
+          const nights = Number(nightInput.value) || 0;
+          priceDisplay.innerText = `฿ ${(nights * 500).toLocaleString()}`;
+        };
+        nightInput.addEventListener('input', calculate);
+      },
       preConfirm: () => {
         const name = (document.getElementById('swal-name') as HTMLInputElement).value;
         const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
         const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
-        const checkOut = (document.getElementById('swal-checkout') as HTMLInputElement).value;
+        const night = (document.getElementById('swal-checkout') as HTMLInputElement).value;
+
         if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
         if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-        if (!checkIn || !checkOut) { Swal.showValidationMessage('กรุณาเลือกวันที่'); return false; }
+        if (!checkIn || !night) { Swal.showValidationMessage('กรุณาเลือกวันที่และจำนวนคืน'); return false; }
+
+        const nightsCount = Number(night);
+        const checkOutDate = new Date(checkIn);
+        checkOutDate.setDate(checkOutDate.getDate() + nightsCount);
+
         return {
           customerName: name,
           customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
           roomId: Number(room),
           checkIn,
-          checkOut,
-          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
+          checkOut: checkOutDate.toISOString(),
+          totalPrice: nightsCount * 500,
         };
       },
     });
