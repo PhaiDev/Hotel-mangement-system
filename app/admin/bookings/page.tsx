@@ -264,21 +264,38 @@ export default function BookingsPage() {
       { value: 'COMPLETED', label: '✓ เช็คเอาท์' },
       { value: 'CANCELLED', label: '✕ ยกเลิก' },
     ];
-
     const { value: status } = await SwalStyled.fire({
       title: '🔄 เปลี่ยนสถานะ',
-      html: `<div style="font-size:13px; margin-bottom:4px;">การจองของ <strong>${b.customerName}</strong></div>`,
-      input: 'select',
-      inputOptions: Object.fromEntries(statusOptions.map(s => [s.value, s.label])),
-      inputValue: b.status,
+      html: `
+      <div style="font-size:13px; margin-bottom:15px;">การจองของ <strong>${b.customerName}</strong></div>
+      <div id="status-buttons" style="display: flex; flex-direction: column; gap: 8px;">
+        ${statusOptions.map(s => `
+          <button class="swal2-confirm swal2-styled status-btn" 
+                  data-value="${s.value}" 
+                  style="margin: 0; background-color: ${b.status === s.value ? '#6e7881' : '#3085d6'}">
+            ${s.label}
+          </button>
+        `).join('')}
+      </div>
+    `,
+      showConfirmButton: false, // ปิดปุ่มยืนยันหลัก เพราะเราจะใช้ปุ่ม Custom
       showCancelButton: true,
-      confirmButtonText: '💾 บันทึก',
       cancelButtonText: 'ยกเลิก',
+      didOpen: () => {
+        const container = SwalStyled.getHtmlContainer();
+        const buttons = container?.querySelectorAll('.status-btn');
+        buttons?.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const val = btn.getAttribute('data-value');
+            SwalStyled.close(); // ปิด Swal พร้อมส่งค่าออกไป
+          });
+        });
+      }
     });
 
     if (status) {
       try {
-        await backend.updateBookingStatus(b.id, status as BookingStatus);
+        await backend.updateBookingStatus(b.id, status as any);
         SwalStyled.fire({ icon: 'success', title: 'อัปเดตสำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchData();
       } catch (err: any) {
@@ -287,23 +304,21 @@ export default function BookingsPage() {
     }
   };
 
-  // ===== CREATE BOOKING =====
-  const onCreateBooking = async () => {
+  // ===== CREATE BOOKING QUICK (DAILY) =====
+  const onCreateBookingQuick = async () => {
+    const DAILY_PRICE = 500;
     const now = new Date();
     const checkInDefault = now.toISOString().split('T')[0];
-    now.setDate(now.getDate() + 1);
-    const checkOutDefault = now.toISOString().split('T')[0];
-    const defultNight = 1;
     const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 
     const { value: formValues } = await SwalStyled.fire({
-      title: '➕ สร้างการจองใหม่',
+      title: '⚡ จองด่วน (รายวัน)',
       html: `
         <div style="text-align:left;">
           <label class="swal-form-label">ชื่อผู้เข้าพัก *</label>
           <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล">
 
-          <label class="swal-form-label">เบอร์โทร / LINE</label>
+          <label class="swal-form-label">LINE / เบอร์โทร</label>
           <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
 
           <label class="swal-form-label">ห้องพัก *</label>
@@ -314,56 +329,54 @@ export default function BookingsPage() {
 
           <div class="swal-form-row">
             <div>
-              <label class="swal-form-label">เช็คอิน *</label>
+              <label class="swal-form-label">เช็คอิน</label>
               <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
             </div>
             <div>
-              <label class="swal-form-label">จำนวนคืน *</label>
-              <input id="swal-checkout" type="number" value="${defultNight}" min="1" class="swal-form-input">
+              <label class="swal-form-label">จำนวนคืน</label>
+              <input id="swal-nights" type="number" value="1" min="1" class="swal-form-input">
             </div>
           </div>
 
           <div style="margin-top: 20px; padding: 12px 16px; background: #fafaf8; border-radius: 12px; border: 1px solid #e2e0d8; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 12px; color: #8a8780; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">ยอดรวม (Total Price)</div>
-            <div id="price-display" style="font-size: 22px; font-weight: 800; color: #c9440f;">฿${defultNight * 500}</div>
+            <div style="font-size: 11px; color: #8a8780; font-weight: 700; text-transform: uppercase;">ยอดรวมประมาณการ</div>
+            <div id="quick-price-display" style="font-size: 20px; font-weight: 800; color: #c9440f;">฿${DAILY_PRICE}</div>
           </div>
         </div>
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: '✨ สร้างการจอง',
+      confirmButtonText: '⚡ ยืนยันจองด่วน',
       cancelButtonText: 'ยกเลิก',
-      width: 520,
+      width: 480,
       didOpen: () => {
-        const nightInput = document.getElementById('swal-checkout') as HTMLInputElement;
-        const priceDisplay = document.getElementById('price-display') as HTMLElement;
-        const calculate = () => {
-          const nights = Number(nightInput.value) || 0;
-          priceDisplay.innerText = `฿ ${(nights * 500).toLocaleString()}`;
-        };
-        nightInput.addEventListener('input', calculate);
+        const nightsInput = document.getElementById('swal-nights') as HTMLInputElement;
+        const display = document.getElementById('quick-price-display') as HTMLElement;
+        nightsInput.addEventListener('input', () => {
+          const val = Number(nightsInput.value) || 0;
+          display.innerText = `฿${(val * DAILY_PRICE).toLocaleString()}`;
+        });
       },
       preConfirm: () => {
         const name = (document.getElementById('swal-name') as HTMLInputElement).value;
         const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
         const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
-        const night = (document.getElementById('swal-checkout') as HTMLInputElement).value;
+        const nights = Number((document.getElementById('swal-nights') as HTMLInputElement).value) || 1;
 
         if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
         if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-        if (!checkIn || !night) { Swal.showValidationMessage('กรุณาเลือกวันที่และจำนวนคืน'); return false; }
 
-        const nightsCount = Number(night);
         const checkOutDate = new Date(checkIn);
-        checkOutDate.setDate(checkOutDate.getDate() + nightsCount);
+        checkOutDate.setDate(checkOutDate.getDate() + nights);
 
         return {
           customerName: name,
           customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
           roomId: Number(room),
+          status: 'PAID',
           checkIn,
           checkOut: checkOutDate.toISOString(),
-          totalPrice: nightsCount * 500,
+          totalPrice: nights * DAILY_PRICE,
         };
       },
     });
@@ -371,7 +384,176 @@ export default function BookingsPage() {
     if (formValues) {
       try {
         await backend.createBooking(formValues);
-        SwalStyled.fire({ icon: 'success', title: 'สร้างสำเร็จ!', text: 'เพิ่มการจองใหม่เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
+        SwalStyled.fire({ icon: 'success', title: 'จองด่วนสำเร็จ!', timer: 1500, showConfirmButton: false });
+        fetchData();
+      } catch (err: any) {
+        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      }
+    }
+  };
+
+  // ===== CREATE BOOKING TEMPORARY (ชั่วคราว) =====
+  const onCreateBookingTemporary = async () => {
+    const TEMP_PRICE = 300;
+    const now = new Date();
+    const checkInDefault = now.toISOString().split('T')[0];
+    const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+
+    const { value: formValues } = await SwalStyled.fire({
+      title: '🕒 จองชั่วคราว (3-4 ชม.)',
+      html: `
+        <div style="text-align:left;">
+          <label class="swal-form-label">ชื่อผู้เข้าพัก</label>
+          <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล (ถ้ามี)">
+
+          <label class="swal-form-label">LINE / เบอร์โทร</label>
+          <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
+
+          <label class="swal-form-label">ห้องพัก *</label>
+          <select id="swal-room" class="swal-form-select">
+            <option value="">-- เลือกห้อง --</option>
+            ${roomOptions}
+          </select>
+
+          <div class="swal-form-row">
+            <div>
+              <label class="swal-form-label">วันที่</label>
+              <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
+            </div>
+            <div>
+              <label class="swal-form-label">ราคา (฿)</label>
+              <input id="swal-price" type="number" value="${TEMP_PRICE}" class="swal-form-input">
+            </div>
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: '🕒 ยืนยันจองชั่วคราว',
+      cancelButtonText: 'ยกเลิก',
+      width: 480,
+      preConfirm: () => {
+        const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
+        const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
+        if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
+
+        return {
+          customerName: (document.getElementById('swal-name') as HTMLInputElement).value || 'ลูกค้าชั่วคราว',
+          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
+          roomId: Number(room),
+          status: 'PAID',
+          checkIn,
+          checkOut: checkIn, // Same day for temporary
+          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || TEMP_PRICE,
+        };
+      },
+    });
+
+    if (formValues) {
+      try {
+        await backend.createBooking(formValues);
+        SwalStyled.fire({ icon: 'success', title: 'จองชั่วคราวสำเร็จ!', timer: 1500, showConfirmButton: false });
+        fetchData();
+      } catch (err: any) {
+        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      }
+    }
+  };
+
+  // ===== CREATE BOOKING (INDEPENDENT) =====
+  const onCreateBooking = async () => {
+    const DEFAULT_PRICE = 500;
+    const now = new Date();
+    const checkInDefault = now.toISOString().split('T')[0];
+    const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    const statusOptions = [
+      { value: 'PENDING', label: 'รอชำระเงิน' },
+      { value: 'PAID', label: 'ชำระแล้ว' },
+      { value: 'ACTIVE', label: 'เข้าพัก' },
+      { value: 'COMPLETED', label: 'เช็คเอาท์แล้ว' },
+      { value: 'CANCELLED', label: 'ยกเลิก' },
+    ].map(s => `<option value="${s.value}">${s.label}</option>`).join('');
+
+    const { value: formValues } = await SwalStyled.fire({
+      title: '✨ เพิ่มการจองอิสระ',
+      html: `
+        <div style="text-align:left;">
+          <label class="swal-form-label">ชื่อผู้เข้าพัก *</label>
+          <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล">
+
+          <label class="swal-form-label">LINE / เบอร์โทร</label>
+          <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
+
+          <div class="swal-form-row">
+            <div>
+              <label class="swal-form-label">ห้องพัก *</label>
+              <select id="swal-room" class="swal-form-select">
+                <option value="">-- เลือกห้อง --</option>
+                ${roomOptions}
+              </select>
+            </div>
+            <div>
+              <label class="swal-form-label">สถานะ</label>
+              <select id="swal-status" class="swal-form-select">${statusOptions}</select>
+            </div>
+          </div>
+
+          <div class="swal-form-row">
+            <div>
+              <label class="swal-form-label">เช็คอิน *</label>
+              <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
+            </div>
+            <div>
+              <label class="swal-form-label">เช็คเอาท์ *</label>
+              <input id="swal-checkout" type="date" class="swal-form-input">
+            </div>
+          </div>
+
+          <div class="swal-form-row">
+            <div>
+              <label class="swal-form-label">ยอดเงินรวม (฿)</label>
+              <input id="swal-price" type="number" class="swal-form-input" value="${DEFAULT_PRICE}">
+            </div>
+            <div>
+              <label class="swal-form-label">PIN Code</label>
+              <input id="swal-pin" class="swal-form-input" placeholder="เช่น 1234 (ถ้ามี)">
+            </div>
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: '💾 บันทึกการจอง',
+      cancelButtonText: 'ยกเลิก',
+      width: 520,
+      preConfirm: () => {
+        const name = (document.getElementById('swal-name') as HTMLInputElement).value;
+        const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
+        const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
+        const checkOut = (document.getElementById('swal-checkout') as HTMLInputElement).value;
+
+        if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
+        if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
+        if (!checkIn) { Swal.showValidationMessage('กรุณาเลือกวันที่เช็คอิน'); return false; }
+        if (!checkOut) { Swal.showValidationMessage('กรุณาเลือกวันที่เช็คเอาท์'); return false; }
+
+        return {
+          customerName: name,
+          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
+          roomId: Number(room),
+          status: (document.getElementById('swal-status') as HTMLSelectElement).value,
+          checkIn,
+          checkOut,
+          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
+          pinCode: (document.getElementById('swal-pin') as HTMLInputElement).value || null,
+        };
+      },
+    });
+
+    if (formValues) {
+      try {
+        await backend.createBooking(formValues);
+        SwalStyled.fire({ icon: 'success', title: 'สร้างการจองสำเร็จ!', text: 'เพิ่มข้อมูลการจองใหม่เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
         fetchData();
       } catch (err: any) {
         SwalStyled.fire('ล้มเหลว', err.message, 'error');
@@ -401,14 +583,20 @@ export default function BookingsPage() {
     <div className="animate-in fade-in duration-500">
       <div className="bg-white border border-[#e2e0d8] rounded-2xl overflow-hidden shadow-sm">
         {/* Top Header */}
-        <div className="p-4 sm:p-6 border-b border-[#e2e0d8] flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-[#e2e0d8] flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="text-[16px] font-bold tracking-tight text-[#1a1916]">รายการจองห้องพัก</div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button onClick={fetchData} className="p-2.5 rounded-xl border border-[#e2e0d8] text-[#8a8780] hover:bg-[#fafaf8] transition-all active:scale-95">
               <RefreshCw className="w-4 h-4" />
             </button>
-            <button onClick={onCreateBooking} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20">
-              <Plus className="w-4 h-4" /> เพิ่มการจอง
+            <button onClick={onCreateBookingQuick} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
+              <Plus className="w-4 h-4" /> เพิ่มการจองด่วน (รายวัน)
+            </button>
+            <button onClick={onCreateBookingTemporary} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
+              <Plus className="w-4 h-4" /> เพิ่มการจองชั่วคราว
+            </button>
+            <button onClick={onCreateBooking} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
+              <Plus className="w-4 h-4" /> เพิ่มการจองอิสระ
             </button>
           </div>
         </div>
