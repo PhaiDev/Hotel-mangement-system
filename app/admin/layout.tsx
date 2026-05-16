@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { Grid, List, DoorOpen, LineChart, LogOut, Menu, X, User, CalendarDays } from 'lucide-react';
+import { Grid, List, DoorOpen, LineChart, LogOut, Menu, X, User, CalendarDays, Settings } from 'lucide-react';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event) => {
         if (event === 'SIGNED_OUT') {
           router.push('/admin/login');
         }
@@ -74,6 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'จัดการห้อง', path: '/admin/rooms', icon: DoorOpen },
     { name: 'ปฏิทินห้องว่าง', path: '/admin/calendar', icon: CalendarDays },
     { name: 'วิเคราะห์ข้อมูล', path: '/admin/analysis', icon: LineChart },
+    { name: 'ตั้งค่าระบบ', path: '/admin/settings', icon: Settings },
     { name: 'Profile', path: '/admin/profile', icon: User },
   ];
   const getPageTitle = () => {
@@ -148,16 +150,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="text-[14px] font-semibold truncate">{getPageTitle()}</div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-[11px] text-[#1a7a4a] font-mono">
+            <div className="flex items-center gap-1.5 text-[11px] text-[#1a7a4a] font-mono mr-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1a7a4a] animate-pulse"></span>
               LIVE
             </div>
-            {/* <button
-              onClick={() => window.dispatchEvent(new Event('open-booking-modal'))}
-              className="px-3 py-1.5 rounded bg-white border border-[#d0cdc2] text-[12px] hover:bg-[#f5f4f0] transition-colors ml-2"
-            >
-              + จองห้อง
-            </button> */}
+            <NotificationBell />
           </div>
         </div>
 

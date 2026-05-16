@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { backend, Room, Booking } from '@/lib/supabase';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import React, { useState, useMemo } from 'react';
+import { backend } from '@/lib/supabase';
+import { Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   ArcElement,
   Title,
   Tooltip,
@@ -36,7 +35,6 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   ArcElement,
   Title,
   Tooltip,
@@ -48,11 +46,27 @@ export default function AnalysisPage() {
   const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
   const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('7d');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const loading = loadingRooms || loadingBookings;
 
   const fetchData = async () => {
     await Promise.all([mutateRooms(), mutateBookings()]);
   };
+
+  // --- Monthly Summary Calculation ---
+  const monthlySummary = useMemo(() => {
+    const validBookings = bookings.filter(b => {
+      if (!b.checkIn || b.status === 'CANCELLED') return false;
+      const d = new Date(b.checkIn);
+      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+    });
+
+    const income = validBookings.reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
+    const count = validBookings.length;
+
+    return { income, count };
+  }, [bookings, selectedMonth, selectedYear]);
 
   // --- Filtered Data based on Time Range ---
   const filteredBookings = useMemo(() => {
@@ -76,7 +90,6 @@ export default function AnalysisPage() {
     const totalRev = validBookings.reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
     const confirmedCount = validBookings.length;
 
-    const today = new Date().toISOString().split('T')[0];
     const occupiedToday = bookings.filter(b => b.status === 'ACTIVE').length;
     const occupancyRate = rooms.length > 0 ? (occupiedToday / rooms.length) * 100 : 0;
 
@@ -155,7 +168,21 @@ export default function AnalysisPage() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    plugins: { 
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a1916',
+        titleFont: { size: 12, weight: 'bold' as const },
+        bodyFont: { size: 12 },
+        padding: 10,
+        cornerRadius: 8,
+        displayColors: false
+      }
+    },
     scales: {
       y: { beginAtZero: true, grid: { color: '#f0ece8' }, ticks: { font: { size: 10 } } },
       x: { grid: { display: false }, ticks: { font: { size: 10 } } },
@@ -231,6 +258,53 @@ export default function AnalysisPage() {
         />
       </div>
 
+      {/* Monthly Selector Section */}
+      <div className="bg-white border border-[#e2e0d8] rounded-2xl p-6 mb-8 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <h3 className="text-[15px] font-bold text-[#1a1916] flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#c9440f]" /> สรุปรายได้รายเดือน
+            </h3>
+            <p className="text-[11px] text-[#8a8780] font-medium uppercase tracking-wider">เลือกเดือนที่ต้องการตรวจสอบ</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="bg-[#fafaf8] border border-[#e2e0d8] rounded-xl px-4 py-2.5 text-[13px] font-bold text-[#1a1916] outline-none focus:ring-2 focus:ring-[#c9440f]/20"
+            >
+              {['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'].map((m, i) => (
+                <option key={m} value={i}>{m}</option>
+              ))}
+            </select>
+
+            <select 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="bg-[#fafaf8] border border-[#e2e0d8] rounded-xl px-4 py-2.5 text-[13px] font-bold text-[#1a1916] outline-none focus:ring-2 focus:ring-[#c9440f]/20"
+            >
+              {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(y => (
+                <option key={y} value={y}>{y + 543} (พ.ศ.)</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="h-px md:h-12 w-full md:w-px bg-[#e2e0d8]" />
+
+          <div className="flex items-center gap-4 bg-[#1a1916] text-white px-6 py-4 rounded-2xl min-w-[240px]">
+            <div className="p-3 rounded-full bg-white/10 text-[#e88c2a]">
+              <DollarSign className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-0.5">ยอดรายได้เดือนนี้</div>
+              <div className="text-[22px] font-black text-[#e88c2a] leading-none">฿{monthlySummary.income.toLocaleString()}</div>
+              <div className="text-[10px] text-white/30 font-medium mt-1">ทั้งหมด {monthlySummary.count} รายการ</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Main Chart */}
         <div className="lg:col-span-2 bg-white border border-[#e2e0d8] rounded-2xl p-6 shadow-sm flex flex-col h-[400px]">
@@ -243,6 +317,26 @@ export default function AnalysisPage() {
           </div>
           <div className="flex-1 min-h-0">
             <Line data={revenueChartData} options={chartOptions} />
+          </div>
+
+          {/* Mobile-only data list */}
+          <div className="mt-6 lg:hidden border-t border-[#f5f4f0] pt-4">
+            <div className="text-[11px] font-bold text-[#8a8780] uppercase tracking-wider mb-3">รายละเอียดข้อมูล</div>
+            <div className="max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 gap-2">
+                {[...revenueChartData.labels].reverse().map((label, idx) => {
+                  const reverseIdx = revenueChartData.labels.length - 1 - idx;
+                  const value = revenueChartData.datasets[0].data[reverseIdx];
+                  if (value === 0) return null; // Hide zero days to save space
+                  return (
+                    <div key={label} className="flex items-center justify-between p-2.5 bg-[#fafaf8] rounded-xl border border-[#e2e0d8]/50">
+                      <div className="text-[12px] font-bold text-[#1a1916]">{label}</div>
+                      <div className="text-[12px] font-mono font-bold text-[#c9440f]">฿{value.toLocaleString()}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 

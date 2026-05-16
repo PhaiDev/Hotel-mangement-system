@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { backend, Room, Booking } from '@/lib/supabase';
+import { backend } from '@/lib/supabase';
 import { SwalStyled, swalCSS } from '@/lib/swalTheme';
-import { ChevronLeft, ChevronRight, Users, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, RefreshCw, CalendarPlus } from 'lucide-react';
 import useSWR from 'swr';
+import BookingModal from '@/components/BookingModal';
 
 const THAI_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -29,6 +30,10 @@ export default function CalendarPage() {
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+
+  // Booking Modal State
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingModalData, setBookingModalData] = useState<{ roomId?: number, checkIn?: string }>({});
 
   const fetchData = async () => {
     await Promise.all([mutateRooms(), mutateBookings()]);
@@ -110,7 +115,6 @@ export default function CalendarPage() {
         .sort((a, b) => (a.checkIn || '').localeCompare(b.checkIn || ''))[0];
 
       // Check if room is available for the entire rest of the month
-      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
       let availableUntil: string | null = null;
       if (!isBooked) {
         if (nextBooking) {
@@ -327,7 +331,7 @@ export default function CalendarPage() {
               {selectedRooms.map(room => (
                 <div
                   key={room.id}
-                  className={`px-5 py-4 flex items-center gap-4 transition-colors ${room.isBooked ? 'bg-[#fafaf8] opacity-60' : 'hover:bg-[#fafaf8]'
+                  className={`px-5 py-4 flex items-center gap-4 transition-colors group ${room.isBooked ? 'bg-[#fafaf8] opacity-60' : 'hover:bg-[#fafaf8]'
                     }`}
                 >
                   {/* Room Number Badge */}
@@ -338,27 +342,44 @@ export default function CalendarPage() {
                     {room.name.replace(/\D/g, '') || room.id}
                   </div>
 
-                  {/* Room Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[14px]">{room.name}</span>
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-[#8a8780]">
-                        <Users className="w-3 h-3" /> {room.capacity}
-                      </span>
+                  <div className="flex-1 min-w-0 flex items-center justify-between pr-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[14px]">{room.name}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-[#8a8780]">
+                          <Users className="w-3 h-3" /> {room.capacity}
+                        </span>
+                      </div>
+                      <div className={`text-[11px] mt-0.5 ${room.isBooked ? 'text-[#dc2626]' : 'text-[#1a7a4a]'}`}>
+                        {room.isBooked
+                          ? (
+                            <div className="flex flex-col">
+                              <span>🔒 {room.guestName || 'มีผู้จอง'}</span>
+                              {room.guestContact && <span className="opacity-80 ml-4">📞 {room.guestContact}</span>}
+                            </div>
+                          )
+                          : room.availableUntil === 'ว่างตลอดเดือนนี้'
+                            ? '✓ ว่างตลอดเดือนนี้'
+                            : `✓ ว่างถึง ${room.availableUntil}`
+                        }
+                      </div>
                     </div>
-                    <div className={`text-[11px] mt-0.5 ${room.isBooked ? 'text-[#dc2626]' : 'text-[#1a7a4a]'}`}>
-                      {room.isBooked
-                        ? (
-                          <div className="flex flex-col">
-                            <span>🔒 {room.guestName || 'มีผู้จอง'}</span>
-                            {room.guestContact && <span className="opacity-80 ml-4">📞 {room.guestContact}</span>}
-                          </div>
-                        )
-                        : room.availableUntil === 'ว่างตลอดเดือนนี้'
-                          ? '✓ ว่างตลอดเดือนนี้'
-                          : `✓ ว่างถึง ${room.availableUntil}`
-                      }
-                    </div>
+
+                    {/* Action Button for Available Rooms */}
+                    {!room.isBooked && (
+                      <button
+                        onClick={() => {
+                          setBookingModalData({
+                            roomId: room.id,
+                            checkIn: toLocalDateStr(selectedDate)
+                          });
+                          setIsBookingModalOpen(true);
+                        }}
+                        className="opacity-100 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c9440f] text-white text-[11px] font-bold shadow-md hover:bg-[#b03b0d] active:scale-95"
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" /> จอง
+                      </button>
+                    )}
                   </div>
 
                   {/* Status Icon */}
@@ -393,6 +414,16 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        onSuccess={() => {
+          fetchData();
+          SwalStyled.fire({ icon: 'success', title: 'สร้างการจองสำเร็จ!', timer: 1500, showConfirmButton: false });
+        }}
+        initialData={bookingModalData}
+      />
     </div>
   );
 }

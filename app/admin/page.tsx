@@ -1,38 +1,64 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { backend, Room, Booking, BookingStatus } from '@/lib/supabase';
-import { SwalStyled, swalCSS } from '@/lib/swalTheme';
-import Swal from 'sweetalert2';
-import withReactContent from 'sweetalert2-react-content';
+import React, { useState, useEffect, useCallback } from 'react';
+import { backend, Booking, BookingStatus } from '@/lib/supabase';
 import Link from 'next/link';
 import { RefreshCw, Eye } from 'lucide-react';
 import useSWR from 'swr';
+import BookingModal from '@/components/BookingModal';
+import BookingDetailModal from '@/components/BookingDetailModal';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line, Bar } from 'react-chartjs-2';
 
-const MySwal = withReactContent(Swal);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 export default function DashboardPage() {
   const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
   const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
   const loading = loadingRooms || loadingBookings;
 
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isBookingDetailOpen, setIsBookingDetailOpen] = useState(false);
+  const [bookingToView, setBookingToView] = useState<Booking | null>(null);
+
   const fetchAllData = async () => {
     await Promise.all([mutateRooms(), mutateBookings()]);
   };
 
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = swalCSS;
-    document.head.appendChild(style);
+  // ===== CREATE BOOKING from Dashboard =====
+  const onCreateBooking = useCallback(() => {
+    setIsBookingModalOpen(true);
+  }, [setIsBookingModalOpen]);
 
+  useEffect(() => {
     // Listen for booking modal trigger from header button
     const handler = () => onCreateBooking();
     window.addEventListener('open-booking-modal', handler);
     return () => {
-      if (document.head.contains(style)) document.head.removeChild(style);
       window.removeEventListener('open-booking-modal', handler);
     };
-  }, []);
+  }, [onCreateBooking]);
 
   const formatDate = (isoString?: string) => {
     if (!isoString) return '—';
@@ -68,143 +94,88 @@ export default function DashboardPage() {
     .filter(b => b.status !== 'CANCELLED')
     .reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
 
-  // ===== CREATE BOOKING from Dashboard =====
-  const onCreateBooking = async () => {
-    // Wait for rooms to load if needed
-    let availableRoomsList = rooms.filter(r => r.isActive);
-    if (availableRoomsList.length === 0) {
-      try {
-        availableRoomsList = (await backend.getRooms()).filter(r => r.isActive);
-      } catch { }
-    }
-    const roomOptions = availableRoomsList.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-
-    const { value: formValues } = await SwalStyled.fire({
-      title: '➕ สร้างการจองใหม่',
-      html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อผู้เข้าพัก *</label>
-          <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล">
-
-          <label class="swal-form-label">LINE ID</label>
-          <input id="swal-line" class="swal-form-input" placeholder="@line_id">
-
-          <label class="swal-form-label">ห้องพัก *</label>
-          <select id="swal-room" class="swal-form-select">
-            <option value="">-- เลือกห้อง --</option>
-            ${roomOptions}
-          </select>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">เช็คอิน *</label>
-              <input id="swal-checkin" type="date" class="swal-form-input">
-            </div>
-            <div>
-              <label class="swal-form-label">เช็คเอาท์ *</label>
-              <input id="swal-checkout" type="date" class="swal-form-input">
-            </div>
-          </div>
-
-          <label class="swal-form-label">ยอดเงิน (฿)</label>
-          <input id="swal-price" type="number" class="swal-form-input" placeholder="0">
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: '✨ สร้างการจอง',
-      cancelButtonText: 'ยกเลิก',
-      width: 520,
-      preConfirm: () => {
-        const name = (document.getElementById('swal-name') as HTMLInputElement).value;
-        const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
-        const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
-        const checkOut = (document.getElementById('swal-checkout') as HTMLInputElement).value;
-        if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
-        if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-        if (!checkIn || !checkOut) { Swal.showValidationMessage('กรุณาเลือกวันเช็คอิน/เช็คเอาท์'); return false; }
-        return {
-          customerName: name,
-          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
-          roomId: Number(room),
-          checkIn,
-          checkOut,
-          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
-        };
-      },
-    });
-
-    if (formValues) {
-      try {
-        await backend.createBooking(formValues);
-        SwalStyled.fire({ icon: 'success', title: 'สร้างสำเร็จ!', text: 'เพิ่มการจองใหม่เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
-        fetchAllData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
-      }
-    }
-  };
 
   // ===== VIEW DETAIL from Dashboard =====
   const onViewDetail = (b: Booking) => {
-    const room = rooms.find(r => r.id === b.roomId);
-    const pinCode = room ? room.pinLock : null;
-    SwalStyled.fire({
-      title: '📋 รายละเอียดการจอง',
-      html: `
-        <div class="text-left font-sans mt-2">
-          <div class="mb-4">
-            <div class="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> ข้อมูลผู้เข้าพัก</div>
-            <div class="border border-[#e2e0d8] rounded-xl overflow-hidden bg-white">
-              <div class="px-4 py-3 border-b border-[#e2e0d8]">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">ชื่อ-นามสกุล / Name</div>
-                <div class="font-bold text-[14px] text-[#1a1916]">${b.customerName || '—'}</div>
-              </div>
-              <div class="px-4 py-3">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">เบอร์โทร / LINE ID</div>
-                <div class="font-bold font-mono text-[13px] text-[#1a1916]">${b.customerLine || '—'}</div>
-              </div>
-            </div>
-          </div>
+    setBookingToView(b);
+    setIsBookingDetailOpen(true);
+  };
 
-          <div class="mb-5">
-            <div class="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg> รายละเอียดการเข้าพัก</div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="border border-[#e2e0d8] rounded-xl px-4 py-3 bg-white">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">ห้องพัก / Room</div>
-                <div class="font-bold text-[16px] text-[#1a1916] leading-tight mt-1">${getRoomName(b.roomId)}</div>
-              </div>
-              <div class="border border-[#e2e0d8] rounded-xl px-4 py-3 bg-white">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">วันที่ / Dates</div>
-                <div class="font-bold font-mono text-[13px] text-[#1a1916] mt-0.5">${formatDate(b.checkIn)}</div>
-                <div class="text-[10px] text-[#8a8780] mt-0.5">ถึง ${formatDate(b.checkOut)}</div>
-              </div>
-            </div>
-          </div>
+  // --- Analytics Data Prep (Last 7 Days) ---
+  const last7Days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split('T')[0];
+  });
 
-          <div class="mb-5 grid grid-cols-2 gap-3">
-             <div class="border border-[#e2e0d8] rounded-xl px-4 py-2 bg-white flex flex-col justify-center">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">สถานะ / Status</div>
-                <div class="font-bold text-[12px] text-[#1a1916]">${b.status}</div>
-             </div>
-             <div class="border border-[#e2e0d8] rounded-xl px-4 py-2 bg-white flex flex-col justify-center">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">รหัส PIN</div>
-                <div class="font-bold font-mono text-[13px] text-[#1a1916]">${pinCode || '—'}</div>
-             </div>
-          </div>
+  const getDayLabel = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  };
 
-          <div class="bg-[#1a1916] rounded-xl p-5 flex items-center justify-between text-white shadow-md">
-            <div class="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-              <span class="text-[13px] font-medium text-white/80">ยอดสุทธิ (Total)</span>
-            </div>
-            <div class="font-mono text-[26px] font-bold text-[#e88c2a]">฿${Number(b.totalPrice || 0).toLocaleString()}</div>
-          </div>
-        </div>
-      `,
-      confirmButtonText: 'ปิด',
-      width: 440,
-    });
+  const labels = last7Days.map(getDayLabel);
+
+  const revenueData = {
+    labels,
+    datasets: [
+      {
+        label: 'รายได้ (บาท)',
+        data: last7Days.map(date => {
+          return bookings
+            .filter(b => b.status !== 'CANCELLED' && b.checkIn.startsWith(date))
+            .reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
+        }),
+        backgroundColor: '#1a4fa0',
+        borderRadius: 4,
+      }
+    ]
+  };
+
+  const occupancyData = {
+    labels,
+    datasets: [
+      {
+        label: 'จำนวนห้องที่เข้าพัก',
+        data: last7Days.map(date => {
+          const dateTime = new Date(date).getTime();
+          const bookedRooms = new Set(
+            bookings
+              .filter(b => b.status !== 'CANCELLED')
+              .filter(b => {
+                const bIn = new Date(b.checkIn.split('T')[0]).getTime();
+                const bOut = new Date(b.checkOut.split('T')[0]).getTime();
+                return bIn <= dateTime && bOut > dateTime;
+              })
+              .map(b => b.roomId)
+          );
+          return bookedRooms.size;
+        }),
+        borderColor: '#c9440f',
+        backgroundColor: 'rgba(201, 68, 15, 0.1)',
+        tension: 0.4,
+        fill: true,
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      y: { beginAtZero: true, border: { dash: [4, 4] }, grid: { color: '#f0f0f0' }, ticks: { stepSize: 1 } },
+      x: { grid: { display: false } }
+    }
+  };
+
+  const revenueOptions = {
+    ...chartOptions,
+    scales: {
+      y: { beginAtZero: true, border: { dash: [4, 4] }, grid: { color: '#f0f0f0' } },
+      x: { grid: { display: false } }
+    }
   };
 
   if (loading && rooms.length === 0) return (
@@ -245,6 +216,31 @@ export default function DashboardPage() {
           <div className="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-3">รายได้รวม</div>
           <div className="font-mono text-[24px] sm:text-[28px] font-bold leading-none mb-2 text-[#1a4fa0]">฿{todayRevenue.toLocaleString()}</div>
           <div className="text-[11px] sm:text-[12px] text-[#8a8780] font-medium">จาก {bookings.filter(b => b.status !== 'CANCELLED').length} รายการ</div>
+        </div>
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Occupancy Chart */}
+        <div className="bg-white border border-[#e2e0d8] rounded-2xl p-5 shadow-sm">
+          <div className="text-[14px] font-bold tracking-tight text-[#1a1916] mb-4 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#c9440f]"></span>
+            แนวโน้มการเข้าพัก 7 วันย้อนหลัง
+          </div>
+          <div className="h-[250px]">
+            <Line data={occupancyData} options={chartOptions} />
+          </div>
+        </div>
+
+        {/* Revenue Chart */}
+        <div className="bg-white border border-[#e2e0d8] rounded-2xl p-5 shadow-sm">
+          <div className="text-[14px] font-bold tracking-tight text-[#1a1916] mb-4 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#1a4fa0]"></span>
+            รายได้ 7 วันย้อนหลัง (บาท)
+          </div>
+          <div className="h-[250px]">
+            <Bar data={revenueData} options={revenueOptions} />
+          </div>
         </div>
       </div>
 
@@ -323,6 +319,23 @@ export default function DashboardPage() {
           })}
         </div>
       </div>
+
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        onSuccess={fetchAllData}
+      />
+
+      {bookingToView && (
+        <BookingDetailModal
+          isOpen={isBookingDetailOpen}
+          onClose={() => setIsBookingDetailOpen(false)}
+          booking={bookingToView}
+          roomName={rooms.find(r => r.id === bookingToView.roomId)?.name || `ID:${bookingToView.roomId}`}
+          roomPin={rooms.find(r => r.id === bookingToView.roomId)?.pinLock || null}
+          onStatusChange={fetchAllData}
+        />
+      )}
     </div>
   );
 }

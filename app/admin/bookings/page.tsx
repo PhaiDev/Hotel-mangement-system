@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { backend, Room, Booking, BookingStatus } from '@/lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { backend, Booking, BookingStatus } from '@/lib/supabase';
 import { SwalStyled, swalCSS } from '@/lib/swalTheme';
-import Swal from 'sweetalert2';
-import withReactContent from 'sweetalert2-react-content';
-import { Pencil, Trash2, Eye, RefreshCw, Plus, Search } from 'lucide-react';
-import useSWR from 'swr';
 
-const MySwal = withReactContent(Swal);
+import { Pencil, Trash2, Eye, RefreshCw, Plus, Search, LogIn, LogOut, CheckCircle2, FileDown } from 'lucide-react';
+import useSWR from 'swr';
+import BookingModal from '@/components/BookingModal';
+import BookingDetailModal from '@/components/BookingDetailModal';
 
 export default function BookingsPage() {
   const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
@@ -18,6 +17,15 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Booking Modal State
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingModalMode, setBookingModalMode] = useState<'daily' | 'temporary' | 'custom'>('daily');
+  const [bookingToEdit, setBookingToEdit] = useState<Booking | null>(null);
+
+  // Detail Modal State
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailModalBooking, setDetailModalBooking] = useState<Booking | null>(null);
 
   const fetchData = async () => {
     await Promise.all([mutateRooms(), mutateBookings()]);
@@ -31,17 +39,7 @@ export default function BookingsPage() {
     return () => { if (document.head.contains(style)) document.head.removeChild(style); };
   }, []);
 
-  const formatDate = (isoString?: string) => {
-    if (!isoString) return '—';
-    try {
-      const d = new Date(isoString);
-      if (isNaN(d.getTime())) return '—';
-      const y = d.getFullYear() + 543;
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${day}/${m}/${y}`;
-    } catch { return isoString; }
-  };
+
 
   const formatShortDate = (isoString?: string) => {
     if (!isoString) return '—';
@@ -53,12 +51,7 @@ export default function BookingsPage() {
     } catch { return isoString; }
   };
 
-  const toInputDate = (isoString?: string) => {
-    if (!isoString) return '';
-    try {
-      return isoString.split('T')[0]
-    } catch { return ''; }
-  };
+
 
   const statusBadge = (s: BookingStatus) => {
     const statusMap: Record<BookingStatus, React.ReactNode> = {
@@ -82,154 +75,14 @@ export default function BookingsPage() {
 
   // ===== VIEW BOOKING DETAIL =====
   const onViewDetail = (b: Booking) => {
-    const room = rooms.find(r => r.id === b.roomId);
-    const pinCode = room ? room.pinLock : null;
-    SwalStyled.fire({
-      title: '📋 รายละเอียดการจอง',
-      html: `
-        <div class="text-left font-sans mt-2">
-          <div class="mb-4">
-            <div class="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> ข้อมูลผู้เข้าพัก</div>
-            <div class="border border-[#e2e0d8] rounded-xl overflow-hidden bg-white">
-              <div class="px-4 py-3 border-b border-[#e2e0d8]">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">ชื่อ-นามสกุล / Name</div>
-                <div class="font-bold text-[14px] text-[#1a1916]">${b.customerName || '—'}</div>
-              </div>
-              <div class="px-4 py-3">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">เบอร์โทร / LINE ID</div>
-                <div class="font-bold font-mono text-[13px] text-[#1a1916]">${b.customerLine || '—'}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="mb-5">
-            <div class="text-[10px] sm:text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg> รายละเอียดการเข้าพัก</div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="border border-[#e2e0d8] rounded-xl px-4 py-3 bg-white">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">ห้องพัก / Room</div>
-                <div class="font-bold text-[16px] text-[#1a1916] leading-tight mt-1">${getRoomName(b.roomId)}</div>
-              </div>
-              <div class="border border-[#e2e0d8] rounded-xl px-4 py-3 bg-white">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">วันที่ / Dates</div>
-                <div class="font-bold font-mono text-[13px] text-[#1a1916] mt-0.5">${formatDate(b.checkIn)}</div>
-                <div class="text-[10px] text-[#8a8780] mt-0.5">ถึง ${formatDate(b.checkOut)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="mb-5 grid grid-cols-2 gap-3">
-             <div class="border border-[#e2e0d8] rounded-xl px-4 py-2 bg-white flex flex-col justify-center">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">สถานะ / Status</div>
-                <div class="font-bold text-[12px] text-[#1a1916] ">${b.status}</div>
-             </div>
-             <div class="border border-[#e2e0d8] rounded-xl px-4 py-2 bg-white flex flex-col justify-center">
-                <div class="text-[10px] text-[#8a8780] mb-0.5">รหัส PIN</div>
-                <div class="font-bold font-mono text-[13px] text-[#1a1916]">${pinCode || '—'}</div>
-             </div>
-          </div>
-
-          <div class="bg-[#1a1916] rounded-xl p-5 flex items-center justify-between text-white shadow-md">
-            <div class="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-              <span class="text-[13px] font-medium text-white/80">ยอดสุทธิ (Total)</span>
-            </div>
-            <div class="font-mono text-[26px] font-bold text-[#e88c2a]">฿${Number(b.totalPrice || 0).toLocaleString()}</div>
-          </div>
-        </div>
-      `,
-      confirmButtonText: 'ปิด',
-      width: 480,
-    });
+    setDetailModalBooking(b);
+    setIsDetailModalOpen(true);
   };
 
   // ===== EDIT BOOKING =====
   const onEditBooking = async (b: Booking) => {
-    const roomOptions = rooms.map(r => `<option value="${r.id}" ${r.id === b.roomId ? 'selected' : ''}>${r.name}</option>`).join('');
-    const statusOptions = [
-      { value: 'PENDING', label: 'รอชำระเงิน' },
-      { value: 'PAID', label: 'ชำระแล้ว' },
-      { value: 'ACTIVE', label: 'เข้าพัก' },
-      { value: 'COMPLETED', label: 'เช็คเอาท์แล้ว' },
-      { value: 'CANCELLED', label: 'ยกเลิก' },
-    ].map(s => `<option value="${s.value}" ${s.value === b.status ? 'selected' : ''}>${s.label}</option>`).join('');
-
-    const { value: formValues } = await SwalStyled.fire({
-      title: '✏️ แก้ไขการจอง',
-      html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อผู้เข้าพัก</label>
-          <input id="swal-name" class="swal-form-input" value="${b.customerName || ''}" placeholder="ชื่อผู้เข้าพัก">
-
-          <label class="swal-form-label">LINE / เบอร์โทร</label>
-          <input id="swal-line" class="swal-form-input" value="${b.customerLine || ''}" placeholder="081-xxx-xxxx">
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">ห้องพัก</label>
-              <select id="swal-room" class="swal-form-select">${roomOptions}</select>
-            </div>
-            <div>
-              <label class="swal-form-label">สถานะ</label>
-              <select id="swal-status" class="swal-form-select">${statusOptions}</select>
-            </div>
-          </div>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">เช็คอิน</label>
-              <input id="swal-checkin" type="date" class="swal-form-input" value="${toInputDate(b.checkIn)}">
-            </div>
-            <div>
-              <label class="swal-form-label">เช็คเอาท์</label>
-              <input id="swal-checkout" type="date" class="swal-form-input" value="${toInputDate(b.checkOut)}">
-            </div>
-          </div>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">ยอดเงิน (฿)</label>
-              <input id="swal-price" type="number" class="swal-form-input" value="${b.totalPrice || 0}">
-            </div>
-            <div>
-              <label class="swal-form-label">PIN Code</label>
-              <input id="swal-pin" class="swal-form-input" value="${b.pinCode || ''}" placeholder="เช่น 1234">
-            </div>
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: '💾 บันทึก',
-      cancelButtonText: 'ยกเลิก',
-      width: 520,
-      preConfirm: () => {
-        const name = (document.getElementById('swal-name') as HTMLInputElement).value;
-        if (!name.trim()) {
-          Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก');
-          return false;
-        }
-        return {
-          customerName: name,
-          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
-          roomId: Number((document.getElementById('swal-room') as HTMLSelectElement).value),
-          status: (document.getElementById('swal-status') as HTMLSelectElement).value,
-          checkIn: (document.getElementById('swal-checkin') as HTMLInputElement).value,
-          checkOut: (document.getElementById('swal-checkout') as HTMLInputElement).value,
-          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
-          pinCode: (document.getElementById('swal-pin') as HTMLInputElement).value || null,
-        };
-      },
-    });
-
-    if (formValues) {
-      try {
-        await backend.updateBooking(b.id, formValues);
-        SwalStyled.fire({ icon: 'success', title: 'บันทึกสำเร็จ!', text: 'อัปเดตข้อมูลการจองเรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
-        fetchData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
-      }
-    }
+    setBookingToEdit(b);
+    setIsBookingModalOpen(true);
   };
 
   // ===== DELETE BOOKING =====
@@ -249,317 +102,31 @@ export default function BookingsPage() {
         await backend.deleteBooking(b.id);
         SwalStyled.fire({ icon: 'success', title: 'ลบสำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
 
   // ===== CHANGE STATUS =====
   const onChangeStatus = async (b: Booking) => {
-    const statusOptions = [
-      { value: 'PENDING', label: '⏳ รอชำระเงิน' },
-      { value: 'PAID', label: '฿ ชำระแล้ว' },
-      { value: 'ACTIVE', label: '🏠 เข้าพัก' },
-      { value: 'COMPLETED', label: '✓ เช็คเอาท์' },
-      { value: 'CANCELLED', label: '✕ ยกเลิก' },
-    ];
-    const { value: status } = await SwalStyled.fire({
-      title: '🔄 เปลี่ยนสถานะ',
-      html: `
-      <div style="font-size:13px; margin-bottom:15px;">การจองของ <strong>${b.customerName}</strong></div>
-      <div id="status-buttons" style="display: flex; flex-direction: column; gap: 8px;">
-        ${statusOptions.map(s => `
-          <button class="swal2-confirm swal2-styled status-btn" 
-                  data-value="${s.value}" 
-                  style="margin: 0; background-color: ${b.status === s.value ? '#6e7881' : '#3085d6'}">
-            ${s.label}
-          </button>
-        `).join('')}
-      </div>
-    `,
-      showConfirmButton: false, // ปิดปุ่มยืนยันหลัก เพราะเราจะใช้ปุ่ม Custom
-      showCancelButton: true,
-      cancelButtonText: 'ยกเลิก',
-      didOpen: () => {
-        const container = SwalStyled.getHtmlContainer();
-        const buttons = container?.querySelectorAll('.status-btn');
-        buttons?.forEach(btn => {
-          btn.addEventListener('click', () => {
-            const val = btn.getAttribute('data-value');
-            SwalStyled.close(); // ปิด Swal พร้อมส่งค่าออกไป
-          });
-        });
-      }
-    });
+    // We now just open the detail modal which has a beautiful status changer inside
+    setDetailModalBooking(b);
+    setIsDetailModalOpen(true);
+  };
 
-    if (status) {
-      try {
-        await backend.updateBookingStatus(b.id, status as any);
-        SwalStyled.fire({ icon: 'success', title: 'อัปเดตสำเร็จ!', timer: 1500, showConfirmButton: false });
-        fetchData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
-      }
+  // ===== QUICK STATUS CHANGE (ONE-CLICK) =====
+  const handleQuickStatusChange = async (b: Booking, newStatus: BookingStatus) => {
+    try {
+      await backend.updateBooking(b.id, { status: newStatus });
+      SwalStyled.fire({ icon: 'success', title: 'อัปเดตสถานะสำเร็จ!', timer: 1000, showConfirmButton: false });
+      fetchData();
+    } catch (err: unknown) {
+      SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
     }
   };
 
-  // ===== CREATE BOOKING QUICK (DAILY) =====
-  const onCreateBookingQuick = async () => {
-    const DAILY_PRICE = 500;
-    const now = new Date();
-    const checkInDefault = now.toISOString().split('T')[0];
-    const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 
-    const { value: formValues } = await SwalStyled.fire({
-      title: '⚡ จองด่วน (รายวัน)',
-      html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อผู้เข้าพัก *</label>
-          <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล">
-
-          <label class="swal-form-label">LINE / เบอร์โทร</label>
-          <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
-
-          <label class="swal-form-label">ห้องพัก *</label>
-          <select id="swal-room" class="swal-form-select">
-            <option value="">-- เลือกห้อง --</option>
-            ${roomOptions}
-          </select>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">เช็คอิน</label>
-              <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
-            </div>
-            <div>
-              <label class="swal-form-label">จำนวนคืน</label>
-              <input id="swal-nights" type="number" value="1" min="1" class="swal-form-input">
-            </div>
-          </div>
-
-          <div style="margin-top: 20px; padding: 12px 16px; background: #fafaf8; border-radius: 12px; border: 1px solid #e2e0d8; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 11px; color: #8a8780; font-weight: 700; text-transform: uppercase;">ยอดรวมประมาณการ</div>
-            <div id="quick-price-display" style="font-size: 20px; font-weight: 800; color: #c9440f;">฿${DAILY_PRICE}</div>
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: '⚡ ยืนยันจองด่วน',
-      cancelButtonText: 'ยกเลิก',
-      width: 480,
-      didOpen: () => {
-        const nightsInput = document.getElementById('swal-nights') as HTMLInputElement;
-        const display = document.getElementById('quick-price-display') as HTMLElement;
-        nightsInput.addEventListener('input', () => {
-          const val = Number(nightsInput.value) || 0;
-          display.innerText = `฿${(val * DAILY_PRICE).toLocaleString()}`;
-        });
-      },
-      preConfirm: () => {
-        const name = (document.getElementById('swal-name') as HTMLInputElement).value;
-        const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
-        const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
-        const nights = Number((document.getElementById('swal-nights') as HTMLInputElement).value) || 1;
-
-        if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
-        if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-
-        const checkOutDate = new Date(checkIn);
-        checkOutDate.setDate(checkOutDate.getDate() + nights);
-
-        return {
-          customerName: name,
-          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
-          roomId: Number(room),
-          status: 'PAID',
-          checkIn,
-          checkOut: checkOutDate.toISOString(),
-          totalPrice: nights * DAILY_PRICE,
-        };
-      },
-    });
-
-    if (formValues) {
-      try {
-        await backend.createBooking(formValues);
-        SwalStyled.fire({ icon: 'success', title: 'จองด่วนสำเร็จ!', timer: 1500, showConfirmButton: false });
-        fetchData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
-      }
-    }
-  };
-
-  // ===== CREATE BOOKING TEMPORARY (ชั่วคราว) =====
-  const onCreateBookingTemporary = async () => {
-    const TEMP_PRICE = 300;
-    const now = new Date();
-    const checkInDefault = now.toISOString().split('T')[0];
-    const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-
-    const { value: formValues } = await SwalStyled.fire({
-      title: '🕒 จองชั่วคราว (3-4 ชม.)',
-      html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อผู้เข้าพัก</label>
-          <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล (ถ้ามี)">
-
-          <label class="swal-form-label">LINE / เบอร์โทร</label>
-          <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
-
-          <label class="swal-form-label">ห้องพัก *</label>
-          <select id="swal-room" class="swal-form-select">
-            <option value="">-- เลือกห้อง --</option>
-            ${roomOptions}
-          </select>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">วันที่</label>
-              <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
-            </div>
-            <div>
-              <label class="swal-form-label">ราคา (฿)</label>
-              <input id="swal-price" type="number" value="${TEMP_PRICE}" class="swal-form-input">
-            </div>
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: '🕒 ยืนยันจองชั่วคราว',
-      cancelButtonText: 'ยกเลิก',
-      width: 480,
-      preConfirm: () => {
-        const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
-        const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
-        if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-
-        return {
-          customerName: (document.getElementById('swal-name') as HTMLInputElement).value || 'ลูกค้าชั่วคราว',
-          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
-          roomId: Number(room),
-          status: 'PAID',
-          checkIn,
-          checkOut: checkIn, // Same day for temporary
-          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || TEMP_PRICE,
-        };
-      },
-    });
-
-    if (formValues) {
-      try {
-        await backend.createBooking(formValues);
-        SwalStyled.fire({ icon: 'success', title: 'จองชั่วคราวสำเร็จ!', timer: 1500, showConfirmButton: false });
-        fetchData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
-      }
-    }
-  };
-
-  // ===== CREATE BOOKING (INDEPENDENT) =====
-  const onCreateBooking = async () => {
-    const DEFAULT_PRICE = 500;
-    const now = new Date();
-    const checkInDefault = now.toISOString().split('T')[0];
-    const roomOptions = rooms.filter(r => r.isActive).map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-    const statusOptions = [
-      { value: 'PENDING', label: 'รอชำระเงิน' },
-      { value: 'PAID', label: 'ชำระแล้ว' },
-      { value: 'ACTIVE', label: 'เข้าพัก' },
-      { value: 'COMPLETED', label: 'เช็คเอาท์แล้ว' },
-      { value: 'CANCELLED', label: 'ยกเลิก' },
-    ].map(s => `<option value="${s.value}">${s.label}</option>`).join('');
-
-    const { value: formValues } = await SwalStyled.fire({
-      title: '✨ เพิ่มการจองอิสระ',
-      html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อผู้เข้าพัก *</label>
-          <input id="swal-name" class="swal-form-input" placeholder="ชื่อ-นามสกุล">
-
-          <label class="swal-form-label">LINE / เบอร์โทร</label>
-          <input id="swal-line" class="swal-form-input" placeholder="081-xxx-xxxx">
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">ห้องพัก *</label>
-              <select id="swal-room" class="swal-form-select">
-                <option value="">-- เลือกห้อง --</option>
-                ${roomOptions}
-              </select>
-            </div>
-            <div>
-              <label class="swal-form-label">สถานะ</label>
-              <select id="swal-status" class="swal-form-select">${statusOptions}</select>
-            </div>
-          </div>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">เช็คอิน *</label>
-              <input id="swal-checkin" type="date" value="${checkInDefault}" class="swal-form-input">
-            </div>
-            <div>
-              <label class="swal-form-label">เช็คเอาท์ *</label>
-              <input id="swal-checkout" type="date" class="swal-form-input">
-            </div>
-          </div>
-
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">ยอดเงินรวม (฿)</label>
-              <input id="swal-price" type="number" class="swal-form-input" value="${DEFAULT_PRICE}">
-            </div>
-            <div>
-              <label class="swal-form-label">PIN Code</label>
-              <input id="swal-pin" class="swal-form-input" placeholder="เช่น 1234 (ถ้ามี)">
-            </div>
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: '💾 บันทึกการจอง',
-      cancelButtonText: 'ยกเลิก',
-      width: 520,
-      preConfirm: () => {
-        const name = (document.getElementById('swal-name') as HTMLInputElement).value;
-        const room = (document.getElementById('swal-room') as HTMLSelectElement).value;
-        const checkIn = (document.getElementById('swal-checkin') as HTMLInputElement).value;
-        const checkOut = (document.getElementById('swal-checkout') as HTMLInputElement).value;
-
-        if (!name.trim()) { Swal.showValidationMessage('กรุณากรอกชื่อผู้เข้าพัก'); return false; }
-        if (!room) { Swal.showValidationMessage('กรุณาเลือกห้องพัก'); return false; }
-        if (!checkIn) { Swal.showValidationMessage('กรุณาเลือกวันที่เช็คอิน'); return false; }
-        if (!checkOut) { Swal.showValidationMessage('กรุณาเลือกวันที่เช็คเอาท์'); return false; }
-
-        return {
-          customerName: name,
-          customerLine: (document.getElementById('swal-line') as HTMLInputElement).value,
-          roomId: Number(room),
-          status: (document.getElementById('swal-status') as HTMLSelectElement).value,
-          checkIn,
-          checkOut,
-          totalPrice: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
-          pinCode: (document.getElementById('swal-pin') as HTMLInputElement).value || null,
-        };
-      },
-    });
-
-    if (formValues) {
-      try {
-        await backend.createBooking(formValues);
-        SwalStyled.fire({ icon: 'success', title: 'สร้างการจองสำเร็จ!', text: 'เพิ่มข้อมูลการจองใหม่เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
-        fetchData();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
-      }
-    }
-  };
 
   const tabs = [
     { id: 'all', label: 'ทั้งหมด', count: bookings.length },
@@ -579,6 +146,45 @@ export default function BookingsPage() {
     </div>
   );
 
+  const exportToCSV = () => {
+    if (filtered.length === 0) {
+      SwalStyled.fire('ไม่มีข้อมูล', 'ไม่มีข้อมูลการจองในตารางสำหรับส่งออก', 'info');
+      return;
+    }
+
+    const headers = ['รหัสการจอง', 'ชื่อลูกค้า', 'เบอร์ติดต่อ/LINE', 'ห้องพัก', 'วันที่เช็คอิน', 'วันที่เช็คเอาท์', 'ยอดเงิน', 'สถานะ', 'วันที่สร้าง'];
+    
+    const csvRows = [headers.join(',')];
+    
+    filtered.forEach(b => {
+      const roomName = getRoomName(b.roomId);
+      const escapeCsv = (str: string) => `"${String(str || '').replace(/"/g, '""')}"`;
+      
+      const row = [
+        b.id,
+        escapeCsv(b.customerName),
+        escapeCsv(b.customerLine),
+        escapeCsv(roomName),
+        b.checkIn.split('T')[0],
+        b.checkOut.split('T')[0],
+        b.totalPrice,
+        b.status,
+        b.createdAt.split('T')[0]
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = '\uFEFF' + csvRows.join('\n'); 
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bookings_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="animate-in fade-in duration-500">
       <div className="bg-white border border-[#e2e0d8] rounded-2xl overflow-hidden shadow-sm">
@@ -586,16 +192,19 @@ export default function BookingsPage() {
         <div className="p-4 sm:p-6 border-b border-[#e2e0d8] flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="text-[16px] font-bold tracking-tight text-[#1a1916]">รายการจองห้องพัก</div>
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button onClick={fetchData} className="p-2.5 rounded-xl border border-[#e2e0d8] text-[#8a8780] hover:bg-[#fafaf8] transition-all active:scale-95">
+            <button onClick={exportToCSV} className="p-2.5 rounded-xl border border-[#e2e0d8] text-[#1a7a4a] bg-[#eaf5ef] hover:bg-[#d4ede1] transition-all active:scale-95" title="ส่งออก CSV">
+              <FileDown className="w-4 h-4" />
+            </button>
+            <button onClick={fetchData} className="p-2.5 rounded-xl border border-[#e2e0d8] text-[#8a8780] hover:bg-[#fafaf8] transition-all active:scale-95" title="รีเฟรช">
               <RefreshCw className="w-4 h-4" />
             </button>
-            <button onClick={onCreateBookingQuick} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
+            <button onClick={() => { setBookingModalMode('daily'); setIsBookingModalOpen(true); }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
               <Plus className="w-4 h-4" /> เพิ่มการจองด่วน (รายวัน)
             </button>
-            <button onClick={onCreateBookingTemporary} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
+            <button onClick={() => { setBookingModalMode('temporary'); setIsBookingModalOpen(true); }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
               <Plus className="w-4 h-4" /> เพิ่มการจองชั่วคราว
             </button>
-            <button onClick={onCreateBooking} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
+            <button onClick={() => { setBookingModalMode('custom'); setIsBookingModalOpen(true); }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#c9440f] text-white text-[13px] font-bold hover:bg-[#b03b0d] transition-all active:scale-95 shadow-lg shadow-[#c9440f]/20 whitespace-nowrap">
               <Plus className="w-4 h-4" /> เพิ่มการจองอิสระ
             </button>
           </div>
@@ -680,18 +289,38 @@ export default function BookingsPage() {
 
               {/* Card Actions: Primary Buttons */}
               <div className="flex items-center gap-2 pt-2">
-                <button
-                  onClick={() => onViewDetail(b)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#eaf0fb] text-[#1a4fa0] text-[13px] font-bold hover:bg-[#dce6f7] transition-all active:scale-95"
-                >
-                  <Eye className="w-4 h-4" /> ดูรายละเอียด
-                </button>
+                {/* QUICK ACTION BUTTONS */}
+                {b.status === 'PENDING' && (
+                  <button onClick={() => handleQuickStatusChange(b, 'PAID')} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#eaf5ef] text-[#1a7a4a] text-[13px] font-bold hover:bg-[#d5ebd9] transition-all active:scale-95 shadow-sm">
+                    <CheckCircle2 className="w-4 h-4" /> รับชำระเงิน
+                  </button>
+                )}
+                {b.status === 'PAID' && (
+                  <button onClick={() => handleQuickStatusChange(b, 'ACTIVE')} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#eaf0fb] text-[#1a4fa0] text-[13px] font-bold hover:bg-[#dce6f7] transition-all active:scale-95 shadow-sm">
+                    <LogIn className="w-4 h-4" /> เช็คอิน
+                  </button>
+                )}
+                {b.status === 'ACTIVE' && (
+                  <button onClick={() => handleQuickStatusChange(b, 'COMPLETED')} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#fef2f2] text-[#dc2626] text-[13px] font-bold hover:bg-[#fde2e2] transition-all active:scale-95 shadow-sm">
+                    <LogOut className="w-4 h-4" /> เช็คเอาท์
+                  </button>
+                )}
+                {(b.status === 'COMPLETED' || b.status === 'CANCELLED') && (
+                  <button onClick={() => onViewDetail(b)} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#fafaf8] border border-[#e2e0d8] text-[#1a1916] text-[13px] font-bold hover:bg-[#f5f4f0] transition-all active:scale-95 shadow-sm">
+                    <Eye className="w-4 h-4" /> ดูรายละเอียด
+                  </button>
+                )}
 
-                <div className="flex gap-2">
-                  <button onClick={() => onEditBooking(b)} className="p-2.5 rounded-xl border border-[#fdf3d0] bg-[#fdf8e7] text-[#b58a00] hover:bg-[#fcf1c5] transition-all active:scale-95" title="แก้ไข">
+                <div className="flex gap-1.5">
+                  {(b.status === 'PENDING' || b.status === 'PAID' || b.status === 'ACTIVE') && (
+                    <button onClick={() => onViewDetail(b)} className="p-2.5 rounded-xl border border-[#e2e0d8] bg-white text-[#8a8780] hover:bg-[#fafaf8] transition-all active:scale-95 shadow-sm" title="รายละเอียด">
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button onClick={() => onEditBooking(b)} className="p-2.5 rounded-xl border border-[#fdf3d0] bg-[#fdf8e7] text-[#b58a00] hover:bg-[#fcf1c5] transition-all active:scale-95 shadow-sm" title="แก้ไข">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => onDeleteBooking(b)} className="p-2.5 rounded-xl border border-[#fee2e2] bg-[#fef2f2] text-[#dc2626] hover:bg-[#fde2e2] transition-all active:scale-95" title="ลบ">
+                  <button onClick={() => onDeleteBooking(b)} className="p-2.5 rounded-xl border border-[#fee2e2] bg-[#fef2f2] text-[#dc2626] hover:bg-[#fde2e2] transition-all active:scale-95 shadow-sm" title="ลบ">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -717,6 +346,31 @@ export default function BookingsPage() {
           </div>
         </div>
       </div>
+
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        initialMode={bookingModalMode}
+        onClose={() => {
+          setIsBookingModalOpen(false);
+          setBookingToEdit(null);
+        }}
+        onSuccess={() => {
+          fetchData();
+          SwalStyled.fire({ icon: 'success', title: bookingToEdit ? 'บันทึกสำเร็จ!' : 'สร้างการจองสำเร็จ!', timer: 1500, showConfirmButton: false });
+        }}
+        bookingToEdit={bookingToEdit ?? undefined}
+      />
+
+      <BookingDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        booking={detailModalBooking}
+        roomName={detailModalBooking ? getRoomName(detailModalBooking.roomId) : ''}
+        roomPin={detailModalBooking ? rooms.find(r => r.id === detailModalBooking.roomId)?.pinLock || null : null}
+        onStatusChange={() => {
+          fetchData();
+        }}
+      />
     </div>
   );
 }

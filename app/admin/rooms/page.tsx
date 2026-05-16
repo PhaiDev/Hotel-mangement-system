@@ -1,14 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { backend, Room, Booking } from '@/lib/supabase';
 import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import Swal from 'sweetalert2';
-import withReactContent from 'sweetalert2-react-content';
+
 import { Pencil, Trash2, Plus, RefreshCw, Key, Users, Lock, Power, LogOut, Info } from 'lucide-react';
 import useSWR from 'swr';
 
-const MySwal = withReactContent(Swal);
+
+const ROOM_IMAGE_FALLBACK = '/mock_room.png';
+
+const escapeHtml = (value: string = '') =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 
 export default function RoomsPage() {
   const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
@@ -49,8 +58,8 @@ export default function RoomsPage() {
         await backend.updateRoomActiveState(roomId, !currentActive);
         SwalStyled.fire({ icon: 'success', title: `${action}สำเร็จ!`, timer: 1500, showConfirmButton: false });
         fetchRooms();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
@@ -77,42 +86,95 @@ export default function RoomsPage() {
         await backend.updateBookingPin(bookingId, newPin);
         SwalStyled.fire({ icon: 'success', title: 'อัปเดต PIN สำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchRooms();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
 
   // ===== EDIT ROOM =====
   const onEditRoom = async (room: Room) => {
+    const bindRoomPreview = () => {
+      const imageInput = document.getElementById('swal-imageUrl') as HTMLInputElement | null;
+      const nameInput = document.getElementById('swal-name') as HTMLInputElement | null;
+      const previewImage = document.getElementById('swal-room-preview') as HTMLImageElement | null;
+      const previewName = document.getElementById('swal-room-preview-name');
+      if (!imageInput || !nameInput || !previewImage || !previewName) return;
+
+      const syncImage = () => {
+        previewImage.src = imageInput.value.trim() || ROOM_IMAGE_FALLBACK;
+      };
+      const syncName = () => {
+        previewName.textContent = nameInput.value.trim() || 'ชื่อห้อง';
+      };
+      imageInput.addEventListener('input', syncImage);
+      nameInput.addEventListener('input', syncName);
+    };
+
     const { value: formValues } = await SwalStyled.fire({
       title: '✏️ แก้ไขห้องพัก',
       html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อห้อง</label>
-          <input id="swal-name" class="swal-form-input" value="${room.name}" placeholder="เช่น Room 101">
+        <div class="room-form-layout">
+          <div class="room-form-panel">
+            <label class="swal-form-label">ชื่อห้อง *</label>
+            <input id="swal-name" class="swal-form-input" value="${escapeHtml(room.name)}" placeholder="เช่น Room 101">
 
-          <label class="swal-form-label">รหัสล็อคเกอร์ (Locker Box)</label>
-          <input id="swal-pinLock" class="swal-form-input" value="${room.pinLock}" placeholder="เช่น Room 101">
-          <div style="margin: 20px"></div>
+            <label class="swal-form-label">รหัสล็อคเกอร์ (Locker Box)</label>
+            <input id="swal-pinLock" class="swal-form-input" value="${escapeHtml(room.pinLock || '')}" placeholder="เช่น 1234">
 
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">ความจุ (ท่าน)</label>
-              <input id="swal-capacity" type="number" class="swal-form-input" value="${room.capacity}" min="1">
+            <div class="swal-form-row">
+              <div>
+                <label class="swal-form-label">ความจุ (ท่าน)</label>
+                <input id="swal-capacity" type="number" class="swal-form-input" value="${room.capacity}" min="1">
+              </div>
+              <div>
+                <label class="swal-form-label">ราคาต่อคืน (บาท)</label>
+                <input id="swal-price" type="number" class="swal-form-input" value="${Number(room.price || 0)}" min="0">
+              </div>
             </div>
-            <div>
-              <label class="swal-form-label">Lock ID</label>
-              <input id="swal-lock" class="swal-form-input" value="${room.lockId || ''}" placeholder="อุปกรณ์ล็อค">
+
+            <div class="swal-form-row">
+              <div>
+                <label class="swal-form-label">Lock ID</label>
+                <input id="swal-lock" class="swal-form-input" value="${escapeHtml(room.lockId || '')}" placeholder="อุปกรณ์ล็อค">
+              </div>
+              <div></div>
+            </div>
+
+            <label class="swal-form-label">ลิงก์รูปภาพห้อง (Image URL)</label>
+            <input id="swal-imageUrl" class="swal-form-input" value="${escapeHtml(room.imageUrl || '')}" placeholder="https://... หรือปล่อยว่าง">
+          </div>
+
+          <div class="room-preview-panel">
+            <div class="room-preview-card">
+              <img
+                id="swal-room-preview"
+                class="room-preview-image"
+                src="${escapeHtml(room.imageUrl || ROOM_IMAGE_FALLBACK)}"
+                alt="room preview"
+                onerror="this.src='${ROOM_IMAGE_FALLBACK}'"
+              />
+              <div class="room-preview-overlay">
+                <div id="swal-room-preview-name" class="room-preview-title">${escapeHtml(room.name)}</div>
+              </div>
             </div>
           </div>
         </div>
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: '💾 บันทึก',
+      confirmButtonText: 'ยืนยันการบันทึก',
       cancelButtonText: 'ยกเลิก',
-      width: 460,
+      width: 640,
+      customClass: {
+        popup: 'sumotel-room-popup',
+        title: 'sumotel-room-title',
+        htmlContainer: 'sumotel-room-html',
+        actions: 'sumotel-room-actions',
+        confirmButton: 'sumotel-room-confirm',
+        cancelButton: 'sumotel-room-cancel',
+      },
+      didOpen: bindRoomPreview,
       preConfirm: () => {
         const name = (document.getElementById('swal-name') as HTMLInputElement).value;
         if (!name.trim()) {
@@ -123,7 +185,9 @@ export default function RoomsPage() {
           name,
           pinLock: (document.getElementById('swal-pinLock') as HTMLInputElement).value,
           capacity: Number((document.getElementById('swal-capacity') as HTMLInputElement).value) || 1,
+          price: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
           lockId: (document.getElementById('swal-lock') as HTMLInputElement).value,
+          imageUrl: (document.getElementById('swal-imageUrl') as HTMLInputElement).value,
         };
       },
     });
@@ -133,41 +197,95 @@ export default function RoomsPage() {
         await backend.updateRoom(room.id, formValues);
         SwalStyled.fire({ icon: 'success', title: 'อัปเดตสำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchRooms();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
 
   // ===== CREATE ROOM =====
   const onCreateRoom = async () => {
+    const bindRoomPreview = () => {
+      const imageInput = document.getElementById('swal-imageUrl') as HTMLInputElement | null;
+      const nameInput = document.getElementById('swal-name') as HTMLInputElement | null;
+      const previewImage = document.getElementById('swal-room-preview') as HTMLImageElement | null;
+      const previewName = document.getElementById('swal-room-preview-name');
+      if (!imageInput || !nameInput || !previewImage || !previewName) return;
+
+      const syncImage = () => {
+        previewImage.src = imageInput.value.trim() || ROOM_IMAGE_FALLBACK;
+      };
+      const syncName = () => {
+        previewName.textContent = nameInput.value.trim() || 'ชื่อห้อง';
+      };
+      imageInput.addEventListener('input', syncImage);
+      nameInput.addEventListener('input', syncName);
+    };
+
     const { value: formValues } = await SwalStyled.fire({
       title: '🏨 เพิ่มห้องพักใหม่',
       html: `
-        <div style="text-align:left;">
-          <label class="swal-form-label">ชื่อห้อง *</label>
-          <input id="swal-name" class="swal-form-input" placeholder="เช่น Room 201">
+        <div class="room-form-layout">
+          <div class="room-form-panel">
+            <label class="swal-form-label">ชื่อห้อง *</label>
+            <input id="swal-name" class="swal-form-input" placeholder="เช่น Room 201">
 
-          <label class="swal-form-label">รหัสล็อคเกอร์ (Locker Box)</label>
-          <input id="swal-pinLock" class="swal-form-input" placeholder="เช่น 1234">
+            <label class="swal-form-label">รหัสล็อคเกอร์ (Locker Box)</label>
+            <input id="swal-pinLock" class="swal-form-input" placeholder="เช่น 1234">
 
-          <div class="swal-form-row">
-            <div>
-              <label class="swal-form-label">ความจุ (ท่าน)</label>
-              <input id="swal-capacity" type="number" class="swal-form-input" value="2" min="1">
+            <div class="swal-form-row">
+              <div>
+                <label class="swal-form-label">ความจุ (ท่าน)</label>
+                <input id="swal-capacity" type="number" class="swal-form-input" value="2" min="1">
+              </div>
+              <div>
+                <label class="swal-form-label">ราคาต่อคืน (บาท)</label>
+                <input id="swal-price" type="number" class="swal-form-input" value="0" min="0">
+              </div>
             </div>
-            <div>
-              <label class="swal-form-label">Lock ID</label>
-              <input id="swal-lock" class="swal-form-input" placeholder="อุปกรณ์ล็อค">
+
+            <div class="swal-form-row">
+              <div>
+                <label class="swal-form-label">Lock ID</label>
+                <input id="swal-lock" class="swal-form-input" placeholder="อุปกรณ์ล็อค">
+              </div>
+              <div></div>
+            </div>
+
+            <label class="swal-form-label">ลิงก์รูปภาพห้อง (Image URL)</label>
+            <input id="swal-imageUrl" class="swal-form-input" placeholder="https://... หรือปล่อยว่าง">
+          </div>
+
+          <div class="room-preview-panel">
+            <div class="room-preview-card">
+              <img
+                id="swal-room-preview"
+                class="room-preview-image"
+                src="${ROOM_IMAGE_FALLBACK}"
+                alt="room preview"
+                onerror="this.src='${ROOM_IMAGE_FALLBACK}'"
+              />
+              <div class="room-preview-overlay">
+                <div id="swal-room-preview-name" class="room-preview-title">ชื่อห้อง</div>
+              </div>
             </div>
           </div>
         </div>
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: '✨ สร้างห้อง',
+      confirmButtonText: 'ยืนยันการสร้าง',
       cancelButtonText: 'ยกเลิก',
-      width: 460,
+      width: 640,
+      customClass: {
+        popup: 'sumotel-room-popup',
+        title: 'sumotel-room-title',
+        htmlContainer: 'sumotel-room-html',
+        actions: 'sumotel-room-actions',
+        confirmButton: 'sumotel-room-confirm',
+        cancelButton: 'sumotel-room-cancel',
+      },
+      didOpen: bindRoomPreview,
       preConfirm: () => {
         const name = (document.getElementById('swal-name') as HTMLInputElement).value;
         if (!name.trim()) {
@@ -178,7 +296,9 @@ export default function RoomsPage() {
           name,
           pinLock: (document.getElementById('swal-pinLock') as HTMLInputElement).value || '',
           capacity: Number((document.getElementById('swal-capacity') as HTMLInputElement).value) || 2,
+          price: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
           lockId: (document.getElementById('swal-lock') as HTMLInputElement).value || '',
+          imageUrl: (document.getElementById('swal-imageUrl') as HTMLInputElement).value || '',
           isActive: true,
         };
       },
@@ -189,11 +309,12 @@ export default function RoomsPage() {
         await backend.createRoom(formValues);
         SwalStyled.fire({ icon: 'success', title: 'สร้างสำเร็จ!', text: 'เพิ่มห้องพักใหม่เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
         fetchRooms();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
+
 
   // ===== QUICK CHECKOUT =====
   const onCheckOut = async (booking: Booking) => {
@@ -211,8 +332,8 @@ export default function RoomsPage() {
         await backend.updateBookingStatus(booking.id, 'COMPLETED');
         SwalStyled.fire({ icon: 'success', title: 'เช็คเอาท์สำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchRooms();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
@@ -243,21 +364,21 @@ export default function RoomsPage() {
         await backend.deleteRoom(room.id);
         SwalStyled.fire({ icon: 'success', title: 'ลบสำเร็จ!', timer: 1500, showConfirmButton: false });
         fetchRooms();
-      } catch (err: any) {
-        SwalStyled.fire('ล้มเหลว', err.message, 'error');
+      } catch (err: unknown) {
+        SwalStyled.fire('ล้มเหลว', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error');
       }
     }
   };
 
-  const getRoomName = (id: number) => rooms.find(r => r.id === id)?.name || id;
-  const formatDate = (d: string | Date) => new Date(d).toLocaleDateString('th-TH', { 
-    day: 'numeric', month: 'short', year: 'numeric' 
+
+  const formatDate = (d: string | Date) => new Date(d).toLocaleDateString('th-TH', {
+    day: 'numeric', month: 'short', year: 'numeric'
   });
 
   const onViewBooking = (b: Booking) => {
     const room = rooms.find(r => r.id === b.roomId);
     const pin = room?.pinLock || b.pinCode;
-    
+
     SwalStyled.fire({
       title: '📋 ข้อมูลการเข้าพัก',
       html: `
@@ -340,16 +461,35 @@ export default function RoomsPage() {
             const isAvailable = !isOccupied && r.isActive;
 
             return (
-              <div key={r.id} className={`border rounded-lg p-4 transition-all hover:shadow-md group bg-white ${isOccupied ? 'border-l-[3px] border-l-[#c9440f] border-[#e2e0d8]' :
-                isAvailable ? 'border-l-[3px] border-l-[#1a7a4a] border-[#e2e0d8]' : 'border-l-[3px] border-l-[#8a8780] border-[#e2e0d8] opacity-70'
+              <div key={r.id} className={`border rounded-xl p-3 transition-all hover:shadow-md group bg-white flex flex-col ${isOccupied ? 'border-t-[4px] border-t-[#c9440f] border-[#e2e0d8]' :
+                isAvailable ? 'border-t-[4px] border-t-[#1a7a4a] border-[#e2e0d8]' : 'border-t-[4px] border-t-[#8a8780] border-[#e2e0d8] opacity-70'
                 }`}>
+
+                {/* Room Image */}
+                <div className="w-full h-[140px] rounded-lg mb-3 overflow-hidden bg-[#f5f4f0] shrink-0 relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={r.imageUrl || '/mock_room.png'}
+                    alt={r.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={(e) => { e.currentTarget.src = '/mock_room.png'; }}
+                  />
+                  {/* Status Overlay on Image */}
+                  <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-md ${isOccupied ? 'bg-white/90 text-[#c9440f]' : isAvailable ? 'bg-[#1a7a4a]/90 text-white' : 'bg-black/50 text-white'}`}>
+                    {isOccupied ? 'มีผู้พัก' : isAvailable ? 'ว่าง' : 'ระงับ'}
+                  </div>
+                </div>
+
                 {/* Room Header */}
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-2 px-1">
                   <div>
                     <div className="font-mono text-[18px] font-medium">{r.name}</div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="inline-flex items-center gap-1 text-[11px] text-[#8a8780]">
                         <Users className="w-3 h-3" /> {r.capacity} ท่าน
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-[#8a8780]">
+                        ฿ {Number(r.price || 0).toLocaleString()}
                       </span>
                       <span className="inline-flex items-center gap-1 text-[11px] text-[#8a8780]">
                         <Lock className="w-3 h-3" /> {r.lockId || '-'}
@@ -365,11 +505,6 @@ export default function RoomsPage() {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
-
-                {/* Status */}
-                <div className={`text-[11px] font-medium mb-1 ${isOccupied ? 'text-[#c9440f]' : isAvailable ? 'text-[#1a7a4a]' : 'text-neutral-500'}`}>
-                  {isOccupied ? `● มีผู้พัก (${activeBooking?.customerName})` : isAvailable ? '● ว่าง' : `● ระงับให้บริการ`}
                 </div>
 
                 {/* PIN */}
@@ -395,23 +530,23 @@ export default function RoomsPage() {
                     <Power className="w-3.5 h-3.5" />
                     {r.isActive ? 'เปิดอยู่' : 'ปิดอยู่'}
                   </button>
-                  
+
                   {isOccupied && activeBooking && (
                     <>
-                    <button 
-                      onClick={() => onViewBooking(activeBooking)}
-                      className="flex items-center justify-center p-2.5 rounded-lg border border-[#1a4fa0]/20 bg-[#eaf0fb] text-[#1a4fa0] hover:bg-[#d4e4fd] transition-all"
-                      title="ดูข้อมูลการเข้าพัก"
-                    >
-                      <Info className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => onCheckOut(activeBooking)}
-                      className="flex items-center justify-center p-2.5 rounded-lg border border-[#c9440f]/20 bg-[#fdf5f2] text-[#c9440f] hover:bg-[#fce9e1] transition-all"
-                      title="เช็คเอาท์ทันที"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </button>
+                      <button
+                        onClick={() => onViewBooking(activeBooking)}
+                        className="flex items-center justify-center p-2.5 rounded-lg border border-[#1a4fa0]/20 bg-[#eaf0fb] text-[#1a4fa0] hover:bg-[#d4e4fd] transition-all"
+                        title="ดูข้อมูลการเข้าพัก"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onCheckOut(activeBooking)}
+                        className="flex items-center justify-center p-2.5 rounded-lg border border-[#c9440f]/20 bg-[#fdf5f2] text-[#c9440f] hover:bg-[#fce9e1] transition-all"
+                        title="เช็คเอาท์ทันที"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
                     </>
                   )}
                 </div>

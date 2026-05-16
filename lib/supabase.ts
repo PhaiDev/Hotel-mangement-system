@@ -6,9 +6,11 @@ export interface Room {
   name: string;
   lockId: string;
   isActive: boolean;
+  price: number;
   capacity: number;
   createdAt: string;
   pinLock: string;
+  imageUrl?: string;
 }
 
 export type BookingStatus = 'PENDING' | 'PAID' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
@@ -132,7 +134,7 @@ export const backend = {
 
   updateBookingStatus: async (id: number, status: BookingStatus, pinCode?: string): Promise<Booking> => {
     const supabase = createClient();
-    const updateData: any = { status };
+    const updateData: { status: BookingStatus; pinCode?: string } = { status };
     if (pinCode !== undefined) updateData.pinCode = pinCode;
     const { data, error } = await supabase.from('Booking').update(updateData).eq('id', id).select().single();
     if (error) throw new Error(error.message);
