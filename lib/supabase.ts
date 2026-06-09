@@ -26,6 +26,7 @@ export interface Booking {
   pinCode?: string;
   totalPrice: number;
   createdAt: string;
+  imageId?: string;
 }
 
 export interface Settings {
@@ -98,7 +99,7 @@ export const backend = {
     return (data && data.length > 0) || false;
   },
 
-  createBooking: async (payload: Omit<Booking, 'id' | 'createdAt' | 'status' | 'pinCode'>): Promise<Booking> => {
+  createBooking: async (payload: Omit<Booking, 'id' | 'createdAt' | 'status'>): Promise<Booking> => {
     const isOverlap = await backend.checkBookingOverlap(payload.roomId, payload.checkIn, payload.checkOut);
     if (isOverlap) throw new Error('ห้องพักไม่ว่างในช่วงเวลาที่เลือก');
 

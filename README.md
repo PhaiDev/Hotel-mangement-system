@@ -149,8 +149,12 @@ CREATE TABLE "Room" (
   "capacity" INTEGER,
   "pinLock" TEXT,
   "price" INTEGER NOT NULL DEFAULT 0,
+<<<<<<< HEAD
   "imageUrl" TEXT,
   "imagePath" TEXT
+=======
+  "imageUrl" TEXT
+>>>>>>> a85e558 (Add uploade image feature, chaneg calendar booking buttton)
 );
 ```
 
@@ -205,13 +209,21 @@ ON "SystemSettings" ((true));
 ระบบไฟล์ควรใช้ Supabase Storage โดยแยก bucket ตามประเภทข้อมูล
 
 ```txt
+<<<<<<< HEAD
 room-images
+=======
+room_image
+>>>>>>> a85e558 (Add uploade image feature, chaneg calendar booking buttton)
 booking-id-cards
 ```
 
 แนะนำ policy:
 
+<<<<<<< HEAD
 - `room-images`: public bucket ได้ เพราะเป็นรูปห้อง
+=======
+- `room_image`: public bucket ได้ เพราะเป็นรูปห้อง
+>>>>>>> a85e558 (Add uploade image feature, chaneg calendar booking buttton)
 - `booking-id-cards`: private bucket เพราะเป็นข้อมูลส่วนบุคคล
 
 รูปบัตรประชาชนควรเปิดผ่าน signed URL จาก backend API เท่านั้น ไม่ควรใช้ public URL
@@ -224,8 +236,13 @@ booking-id-cards
 
 - upload รูปห้องตอนสร้าง/แก้ไขห้อง
 - preview รูปก่อนบันทึก
+<<<<<<< HEAD
 - upload เข้า bucket `room-images`
 - เก็บ `imageUrl` และ `imagePath` ในตาราง `Room`
+=======
+- upload เข้า bucket `room_image`
+- เก็บ `imageUrl` ในตาราง `Room`
+>>>>>>> a85e558 (Add uploade image feature, chaneg calendar booking buttton)
 
 ### Booking ID Card Images
 

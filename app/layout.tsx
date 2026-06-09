@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SUMOTEL",
@@ -30,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th">
-      <body className={`${inter.className} bg-gray-950 text-white selection:bg-[#f59e0b]/30`}>
+      <body className="font-sans bg-gray-950 text-white selection:bg-[#f59e0b]/30">
         <main className="min-h-screen relative overflow-x-hidden">
           <Providers>
             {children}

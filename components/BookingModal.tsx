@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { backend, BookingStatus, Booking } from '@/lib/supabase';
 import useSWR from 'swr';
-import { X, CalendarDays, User, Phone, CheckCircle2, AlertCircle, Moon, Clock } from 'lucide-react';
+import { X, CalendarDays, User, Phone, CheckCircle2, AlertCircle, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface BookingModalProps {
@@ -37,10 +37,13 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
     status: 'PENDING' as BookingStatus,
     totalPrice: 0 as number | string,
     pinCode: '',
+    imageId: '',
   });
 
   const [priceType] = useState<'room' | 'global_daily' | 'global_temp'>('room');
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [bookingMode, setBookingMode] = useState<'daily' | 'temporary' | 'custom'>('daily');
 
@@ -59,6 +62,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
   useEffect(() => {
     if (isOpen) {
       setError('');
+      setSelectedFile(null);
       setBookingMode(initialMode || 'daily');
       if (bookingToEdit) {
         setFormData({
@@ -70,6 +74,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
           status: bookingToEdit.status || 'PENDING',
           totalPrice: bookingToEdit.totalPrice || 0,
           pinCode: bookingToEdit.pinCode || '',
+          imageId: bookingToEdit.imageId || '',
         });
       } else {
         const today = new Date().toISOString().split('T')[0];
@@ -85,10 +90,11 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
           status: 'PENDING',
           totalPrice: 500,
           pinCode: '',
+          imageId: '',
         });
       }
     }
-  }, [isOpen, initialData, bookingToEdit]);
+  }, [isOpen, initialData, bookingToEdit, initialMode]);
 
   // Handle Booking Mode changes (Daily vs Temporary)
   useEffect(() => {
@@ -155,16 +161,38 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
 
     try {
       setIsLoading(true);
+      let finalImageId = formData.imageId;
+
+      // Upload file if selected
+      if (selectedFile) {
+        setIsUploading(true);
+        const uploadData = new FormData();
+        uploadData.append('file', selectedFile);
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadData,
+        });
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok) {
+          throw new Error(uploadResult.message || 'อัปโหลดรูปภาพล้มเหลว');
+        }
+
+        finalImageId = uploadResult.imageId;
+        setIsUploading(false);
+      }
 
       const payload = {
         customerName: formData.customerName,
         customerLine: formData.customerLine,
         roomId: Number(formData.roomId),
-        //status: formData.status,
         checkIn: formData.checkIn,
         checkOut: formData.checkOut,
         totalPrice: Number(formData.totalPrice),
         pinCode: formData.pinCode || undefined,
+        imageId: finalImageId || undefined,
       };
 
       if (bookingToEdit) {
@@ -180,6 +208,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
       setError(message);
     } finally {
       setIsLoading(false);
+      setIsUploading(false);
     }
   };
 
@@ -225,6 +254,13 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
   };
 
   const roomOptions = getAvailableRooms();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -297,7 +333,7 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
                       placeholder="081-xxx-xxxx"
                       className="w-full px-4 py-2.5 rounded-xl border border-[#e2e0d8] bg-[#fcfbf9] focus:bg-white focus:ring-2 focus:ring-[#c9440f]/20 focus:border-[#c9440f] outline-none transition-all text-[14px] font-mono"
                     />
-                  </div>
+                  </div>          
                 </div>
 
                 {/* Room & Status */}
@@ -439,6 +475,25 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
                     </div>
                   </div>
                 </div>
+                 <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold text-[#8a8780] uppercase flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5" /> รูปบัตรประชาชน {(formData.imageId || selectedFile) && <span className="text-green-500 text-[10px] normal-case">({formData.imageId ? 'อัปโหลดแล้ว' : 'เลือกแล้ว'})</span>}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={isLoading}
+                        className="w-full px-4 py-2.5 rounded-xl border border-[#e2e0d8] bg-[#fcfbf9] focus:bg-white focus:ring-2 focus:ring-[#c9440f]/20 focus:border-[#c9440f] outline-none transition-all text-[14px] font-mono disabled:opacity-50"
+                      />
+                    </div>
+                    {(formData.imageId || selectedFile) && (
+                      <p className="text-[11px] text-[#8a8780] mt-1 truncate">
+                        ไฟล์: {selectedFile ? selectedFile.name : formData.imageId}
+                      </p>
+                    )}
+                  </div>  
               </div>
             </div>
 
@@ -457,7 +512,10 @@ export default function BookingModal({ isOpen, onClose, onSuccess, initialData, 
                 className="flex-[2] py-3.5 rounded-xl bg-[#c9440f] text-white font-bold text-[14px] hover:bg-[#b03b0d] transition-all active:scale-[0.98] shadow-lg shadow-[#c9440f]/25 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    {isUploading ? 'กำลังอัปโหลดรูปภาพ...' : 'กำลังบันทึก...'}
+                  </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-5 h-5" /> ยืนยันการจอง
