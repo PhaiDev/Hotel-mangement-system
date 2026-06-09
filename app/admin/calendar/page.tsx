@@ -6,6 +6,7 @@ import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import { ChevronLeft, ChevronRight, Users, RefreshCw, CalendarPlus } from 'lucide-react';
 import useSWR from 'swr';
 import BookingModal from '@/components/BookingModal';
+import { mockRooms } from '@/lib/mock/rooms';
 
 const THAI_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -25,6 +26,20 @@ export default function CalendarPage() {
   const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
   const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
   const loading = loadingRooms || loadingBookings;
+  const effectiveRooms = useMemo(() => {
+    if (rooms.length > 0) return rooms;
+    return mockRooms.map((room) => ({
+      id: room.id,
+      name: `ห้อง ${room.roomNumber}`,
+      lockId: `MOCK-${room.roomNumber}`,
+      isActive: room.isActive,
+      price: room.price,
+      capacity: room.maxGuests,
+      createdAt: new Date().toISOString(),
+      pinLock: '',
+      imageUrl: room.imageUrl,
+    }));
+  }, [rooms]);
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -34,6 +49,7 @@ export default function CalendarPage() {
   // Booking Modal State
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [bookingModalData, setBookingModalData] = useState<{ roomId?: number, checkIn?: string }>({});
+  const [bookingModalMode, setBookingModalMode] = useState<'daily' | 'temporary' | 'custom'>('daily');
 
   const fetchData = async () => {
     await Promise.all([mutateRooms(), mutateBookings()]);
@@ -80,7 +96,7 @@ export default function CalendarPage() {
 
   // Get availability for a date
   const getDateAvailability = (date: Date) => {
-    const activeRooms = rooms.filter(r => r.isActive);
+    const activeRooms = effectiveRooms.filter(r => r.isActive);
     const totalRooms = activeRooms.length;
     if (totalRooms === 0) return { available: 0, total: 0, status: 'empty' as const };
     const bookedCount = activeRooms.filter(r => isRoomBookedOnDate(r.id, date)).length;
@@ -96,7 +112,7 @@ export default function CalendarPage() {
 
   // Get available rooms for selected date
   const getAvailableRoomsForDate = (date: Date) => {
-    const activeRooms = rooms.filter(r => r.isActive);
+    const activeRooms = effectiveRooms.filter(r => r.isActive);
     return activeRooms.map(room => {
       const isBooked = isRoomBookedOnDate(room.id, date);
       // Find the booking for this room on this date
@@ -177,7 +193,7 @@ export default function CalendarPage() {
   const selectedAvailability = getDateAvailability(selectedDate);
   const selectedRooms = getAvailableRoomsForDate(selectedDate);
 
-  if (loading && rooms.length === 0) return (
+  if (loading && effectiveRooms.length === 0) return (
     <div className="py-20 flex justify-center text-[#8a8780]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
@@ -301,15 +317,16 @@ export default function CalendarPage() {
 
         {/* Room Availability Panel */}
         <div className="lg:col-span-2">
-          <div className="bg-white border border-[#e2e0d8] rounded-xl overflow-hidden shadow-sm sticky top-20">
-            {/* Panel Header */}
-            <div className="p-5 border-b border-[#e2e0d8] bg-gradient-to-r from-[#1a1916] to-[#2a2520]">
-              <div className="text-[11px] text-white/40 uppercase tracking-[0.8px] mb-1">ห้องว่าง</div>
-              <div className="text-white font-semibold text-[16px]">
-                {formatThaiDate(selectedDate)}
-              </div>
-              <div className="mt-2.5">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium font-mono ${selectedAvailability.status === 'full'
+          <div className="bg-white border border-[#e2e0d8] rounded-[24px] overflow-hidden shadow-sm sticky top-20">
+            {/* Panel Header - Dark Style from Screenshot */}
+            <div className="p-6 bg-[#1a1916] relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#c9440f] opacity-10 blur-[40px] rounded-full translate-x-10 -translate-y-10" />
+              <div className="relative z-10">
+                <div className="text-[11px] text-white/40 uppercase tracking-[1px] font-bold mb-1">ห้องว่าง</div>
+                <div className="text-white font-bold text-[22px] mb-3">
+                  {formatThaiDate(selectedDate)}
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold font-mono ${selectedAvailability.status === 'full'
                   ? 'bg-[#dc2626]/20 text-[#ff6b6b]'
                   : selectedAvailability.status === 'almost'
                     ? 'bg-[#e88c2a]/20 text-[#e88c2a]'
@@ -321,93 +338,109 @@ export default function CalendarPage() {
             </div>
 
             {/* Room List */}
-            <div className="divide-y divide-[#e2e0d8] max-h-[500px] overflow-y-auto">
+            <div className="divide-y divide-[#f0ece8] max-h-[600px] overflow-y-auto no-scrollbar">
               {selectedRooms.length === 0 && (
-                <div className="py-12 text-center text-[#8a8780]">
-                  <div className="text-[28px] mb-2">🏨</div>
-                  <div className="text-[13px]">ไม่มีห้องพักในระบบ</div>
+                <div className="py-16 text-center text-[#8a8780]">
+                  <div className="text-[32px] mb-2">🏨</div>
+                  <div className="text-[14px] font-medium">ไม่มีห้องพักในระบบ</div>
                 </div>
               )}
               {selectedRooms.map(room => (
                 <div
                   key={room.id}
-                  className={`px-5 py-4 flex items-center gap-4 transition-colors group ${room.isBooked ? 'bg-[#fafaf8] opacity-60' : 'hover:bg-[#fafaf8]'
+                  className={`px-5 py-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${room.isBooked ? 'bg-[#fafaf8] opacity-60' : 'hover:bg-[#fafaf8]'
                     }`}
                 >
-                  {/* Room Number Badge */}
-                  <div className={`w-11 h-11 rounded-lg flex items-center justify-center font-mono text-[13px] font-bold shrink-0 ${room.isBooked
-                    ? 'bg-[#dc2626]/10 text-[#dc2626] border border-[#dc2626]/20'
-                    : 'bg-[#1a7a4a]/10 text-[#1a7a4a] border border-[#1a7a4a]/20'
-                    }`}>
-                    {room.name.replace(/\D/g, '') || room.id}
-                  </div>
+                  <div className="flex items-center gap-4 flex-1">
+                    {/* Room Number Badge */}
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-mono text-[14px] font-bold shrink-0 shadow-sm ${room.isBooked
+                      ? 'bg-[#dc2626]/5 text-[#dc2626] border border-[#dc2626]/10'
+                      : 'bg-[#1a7a4a]/5 text-[#1a7a4a] border border-[#1a7a4a]/10'
+                      }`}>
+                      {room.name.replace(/\D/g, '') || room.id}
+                    </div>
 
-                  <div className="flex-1 min-w-0 flex items-center justify-between pr-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-[14px]">{room.name}</span>
-                        <span className="inline-flex items-center gap-0.5 text-[10px] text-[#8a8780]">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-bold text-[15px] text-[#1a1916] whitespace-nowrap">{room.name}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[11px] text-[#8a8780] font-medium">
                           <Users className="w-3 h-3" /> {room.capacity}
                         </span>
                       </div>
-                      <div className={`text-[11px] mt-0.5 ${room.isBooked ? 'text-[#dc2626]' : 'text-[#1a7a4a]'}`}>
+                      <div className={`text-[12px] font-medium flex items-center gap-1 ${room.isBooked ? 'text-[#dc2626]' : 'text-[#1a7a4a]'}`}>
                         {room.isBooked
-                          ? (
-                            <div className="flex flex-col">
-                              <span>🔒 {room.guestName || 'มีผู้จอง'}</span>
-                              {room.guestContact && <span className="opacity-80 ml-4">📞 {room.guestContact}</span>}
-                            </div>
-                          )
+                          ? <span className="truncate">🔒 {room.guestName || 'มีผู้จอง'}</span>
                           : room.availableUntil === 'ว่างตลอดเดือนนี้'
-                            ? '✓ ว่างตลอดเดือนนี้'
-                            : `✓ ว่างถึง ${room.availableUntil}`
+                            ? <span className="truncate">✓ ว่างตลอดเดือนนี้</span>
+                            : <span className="truncate text-pretty">✓ ว่างถึง {room.availableUntil}</span>
                         }
                       </div>
                     </div>
-
-                    {/* Action Button for Available Rooms */}
-                    {!room.isBooked && (
-                      <button
-                        onClick={() => {
-                          setBookingModalData({
-                            roomId: room.id,
-                            checkIn: toLocalDateStr(selectedDate)
-                          });
-                          setIsBookingModalOpen(true);
-                        }}
-                        className="opacity-100 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c9440f] text-white text-[11px] font-bold shadow-md hover:bg-[#b03b0d] active:scale-95"
-                      >
-                        <CalendarPlus className="w-3.5 h-3.5" /> จอง
-                      </button>
-                    )}
                   </div>
 
-                  {/* Status Icon */}
-                  <div className={`w-3 h-3 rounded-full shrink-0 ${room.isBooked ? 'bg-[#dc2626]' : 'bg-[#1a7a4a]'}`} />
+                  {/* Action Buttons for Available Rooms */}
+                  {!room.isBooked ? (
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-1.5 ml-0 sm:ml-auto">
+                      <button
+                        onClick={() => {
+                          setBookingModalData({ roomId: room.id, checkIn: toLocalDateStr(selectedDate) });
+                          setBookingModalMode('daily');
+                          setIsBookingModalOpen(true);
+                        }}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2.5 sm:py-2 rounded-xl bg-[#1a7a4a] text-white text-[11px] font-bold hover:bg-[#16653d] transition-all active:scale-95 shadow-lg shadow-[#1a7a4a]/20 whitespace-nowrap"
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" /> รายวัน
+                      </button>
+                      <button
+                        onClick={() => {
+                          setBookingModalData({ roomId: room.id, checkIn: toLocalDateStr(selectedDate) });
+                          setBookingModalMode('temporary');
+                          setIsBookingModalOpen(true);
+                        }}
+                        className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2.5 sm:py-2 rounded-xl bg-[#e88c2a] text-white text-[11px] font-bold hover:bg-[#cc7720] transition-all active:scale-95 shadow-lg shadow-[#e88c2a]/20 whitespace-nowrap"
+                      >
+                        ชั่วคราว
+                      </button>
+                      <button
+                        onClick={() => {
+                          setBookingModalData({ roomId: room.id, checkIn: toLocalDateStr(selectedDate) });
+                          setBookingModalMode('custom');
+                          setIsBookingModalOpen(true);
+                        }}
+                        className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2.5 sm:py-2 rounded-xl bg-[#1a4fa0] text-white text-[11px] font-bold hover:bg-[#163f80] transition-all active:scale-95 shadow-lg shadow-[#1a4fa0]/20 whitespace-nowrap"
+                      >
+                        กำหนดเอง
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="hidden sm:block ml-auto">
+                      <div className={`w-3 h-3 rounded-full shrink-0 ${room.isBooked ? 'bg-[#dc2626]' : 'bg-[#1a7a4a]'}`} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
             {/* Quick Stats Footer */}
-            <div className="p-4 border-t border-[#e2e0d8] bg-[#fafaf8]">
+            <div className="p-5 border-t border-[#e2e0d8] bg-[#fafaf8]">
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="font-mono text-[18px] font-medium text-[#1a7a4a]">
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-mono text-[20px] font-bold text-[#1a7a4a]">
                     {selectedRooms.filter(r => !r.isBooked).length}
                   </div>
-                  <div className="text-[10px] text-[#8a8780] uppercase">ว่าง</div>
+                  <div className="text-[10px] text-[#8a8780] font-bold uppercase tracking-wider">ว่าง</div>
                 </div>
-                <div>
-                  <div className="font-mono text-[18px] font-medium text-[#dc2626]">
+                <div className="flex flex-col gap-0.5 border-x border-[#e2e0d8]">
+                  <div className="font-mono text-[20px] font-bold text-[#dc2626]">
                     {selectedRooms.filter(r => r.isBooked).length}
                   </div>
-                  <div className="text-[10px] text-[#8a8780] uppercase">จอง</div>
+                  <div className="text-[10px] text-[#8a8780] font-bold uppercase tracking-wider">จอง</div>
                 </div>
-                <div>
-                  <div className="font-mono text-[18px] font-medium text-[#1a1916]">
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-mono text-[20px] font-bold text-[#1a1916]">
                     {selectedRooms.length}
                   </div>
-                  <div className="text-[10px] text-[#8a8780] uppercase">ทั้งหมด</div>
+                  <div className="text-[10px] text-[#8a8780] font-bold uppercase tracking-wider">ทั้งหมด</div>
                 </div>
               </div>
             </div>
@@ -423,6 +456,7 @@ export default function CalendarPage() {
           SwalStyled.fire({ icon: 'success', title: 'สร้างการจองสำเร็จ!', timer: 1500, showConfirmButton: false });
         }}
         initialData={bookingModalData}
+        initialMode={bookingModalMode}
       />
     </div>
   );

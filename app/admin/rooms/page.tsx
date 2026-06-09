@@ -94,12 +94,16 @@ export default function RoomsPage() {
 
   // ===== EDIT ROOM =====
   const onEditRoom = async (room: Room) => {
+    let selectedFile: File | null = null;
+
     const bindRoomPreview = () => {
       const imageInput = document.getElementById('swal-imageUrl') as HTMLInputElement | null;
+      const fileInput = document.getElementById('swal-file') as HTMLInputElement | null;
       const nameInput = document.getElementById('swal-name') as HTMLInputElement | null;
       const previewImage = document.getElementById('swal-room-preview') as HTMLImageElement | null;
       const previewName = document.getElementById('swal-room-preview-name');
-      if (!imageInput || !nameInput || !previewImage || !previewName) return;
+
+      if (!imageInput || !nameInput || !previewImage || !previewName || !fileInput) return;
 
       const syncImage = () => {
         previewImage.src = imageInput.value.trim() || ROOM_IMAGE_FALLBACK;
@@ -107,6 +111,19 @@ export default function RoomsPage() {
       const syncName = () => {
         previewName.textContent = nameInput.value.trim() || 'ชื่อห้อง';
       };
+
+      fileInput.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        selectedFile = file;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (previewImage) previewImage.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      });
+
       imageInput.addEventListener('input', syncImage);
       nameInput.addEventListener('input', syncName);
     };
@@ -141,7 +158,10 @@ export default function RoomsPage() {
               <div></div>
             </div>
 
-            <label class="swal-form-label">ลิงก์รูปภาพห้อง (Image URL)</label>
+            <label class="swal-form-label">อัปโหลดรูปภาพห้อง</label>
+            <input id="swal-file" type="file" class="swal-form-input" accept="image/*" style="padding: 4px;">
+
+            <label class="swal-form-label">หรือระบุลิงก์รูปภาพ (Image URL)</label>
             <input id="swal-imageUrl" class="swal-form-input" value="${escapeHtml(room.imageUrl || '')}" placeholder="https://... หรือปล่อยว่าง">
           </div>
 
@@ -175,19 +195,43 @@ export default function RoomsPage() {
         cancelButton: 'sumotel-room-cancel',
       },
       didOpen: bindRoomPreview,
-      preConfirm: () => {
+      preConfirm: async () => {
         const name = (document.getElementById('swal-name') as HTMLInputElement).value;
         if (!name.trim()) {
           Swal.showValidationMessage('กรุณากรอกชื่อห้อง');
           return false;
         }
+
+        let imageUrl = (document.getElementById('swal-imageUrl') as HTMLInputElement).value;
+
+        if (selectedFile) {
+          try {
+            Swal.showLoading();
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('bucket', 'room_image');
+
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            });
+
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.message || 'Upload failed');
+            imageUrl = result.url;
+          } catch (err) {
+            Swal.showValidationMessage(`อัปโหลดล้มเหลว: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            return false;
+          }
+        }
+
         return {
           name,
           pinLock: (document.getElementById('swal-pinLock') as HTMLInputElement).value,
           capacity: Number((document.getElementById('swal-capacity') as HTMLInputElement).value) || 1,
           price: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
           lockId: (document.getElementById('swal-lock') as HTMLInputElement).value,
-          imageUrl: (document.getElementById('swal-imageUrl') as HTMLInputElement).value,
+          imageUrl,
         };
       },
     });
@@ -205,12 +249,16 @@ export default function RoomsPage() {
 
   // ===== CREATE ROOM =====
   const onCreateRoom = async () => {
+    let selectedFile: File | null = null;
+
     const bindRoomPreview = () => {
       const imageInput = document.getElementById('swal-imageUrl') as HTMLInputElement | null;
+      const fileInput = document.getElementById('swal-file') as HTMLInputElement | null;
       const nameInput = document.getElementById('swal-name') as HTMLInputElement | null;
       const previewImage = document.getElementById('swal-room-preview') as HTMLImageElement | null;
       const previewName = document.getElementById('swal-room-preview-name');
-      if (!imageInput || !nameInput || !previewImage || !previewName) return;
+
+      if (!imageInput || !nameInput || !previewImage || !previewName || !fileInput) return;
 
       const syncImage = () => {
         previewImage.src = imageInput.value.trim() || ROOM_IMAGE_FALLBACK;
@@ -218,6 +266,19 @@ export default function RoomsPage() {
       const syncName = () => {
         previewName.textContent = nameInput.value.trim() || 'ชื่อห้อง';
       };
+
+      fileInput.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        selectedFile = file;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (previewImage) previewImage.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      });
+
       imageInput.addEventListener('input', syncImage);
       nameInput.addEventListener('input', syncName);
     };
@@ -252,7 +313,10 @@ export default function RoomsPage() {
               <div></div>
             </div>
 
-            <label class="swal-form-label">ลิงก์รูปภาพห้อง (Image URL)</label>
+            <label class="swal-form-label">อัปโหลดรูปภาพห้อง</label>
+            <input id="swal-file" type="file" class="swal-form-input" accept="image/*" style="padding: 4px;">
+
+            <label class="swal-form-label">หรือระบุลิงก์รูปภาพ (Image URL)</label>
             <input id="swal-imageUrl" class="swal-form-input" placeholder="https://... หรือปล่อยว่าง">
           </div>
 
@@ -286,19 +350,43 @@ export default function RoomsPage() {
         cancelButton: 'sumotel-room-cancel',
       },
       didOpen: bindRoomPreview,
-      preConfirm: () => {
+      preConfirm: async () => {
         const name = (document.getElementById('swal-name') as HTMLInputElement).value;
         if (!name.trim()) {
           Swal.showValidationMessage('กรุณากรอกชื่อห้อง');
           return false;
         }
+
+        let imageUrl = (document.getElementById('swal-imageUrl') as HTMLInputElement).value || '';
+
+        if (selectedFile) {
+          try {
+            Swal.showLoading();
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('bucket', 'room_image');
+
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            });
+
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.message || 'Upload failed');
+            imageUrl = result.url;
+          } catch (err) {
+            Swal.showValidationMessage(`อัปโหลดล้มเหลว: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            return false;
+          }
+        }
+
         return {
           name,
           pinLock: (document.getElementById('swal-pinLock') as HTMLInputElement).value || '',
           capacity: Number((document.getElementById('swal-capacity') as HTMLInputElement).value) || 2,
           price: Number((document.getElementById('swal-price') as HTMLInputElement).value) || 0,
           lockId: (document.getElementById('swal-lock') as HTMLInputElement).value || '',
-          imageUrl: (document.getElementById('swal-imageUrl') as HTMLInputElement).value || '',
+          imageUrl,
           isActive: true,
         };
       },

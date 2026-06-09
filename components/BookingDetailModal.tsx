@@ -173,6 +173,28 @@ export default function BookingDetailModal({ isOpen, onClose, booking, roomName,
               </div>
             </div>
 
+            {/* ID Card Image */}
+            {booking.imageId && (
+              <div className="mb-5">
+                <div className="text-[11px] font-bold text-[#8a8780] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5" /> รูปบัตรประชาชน
+                </div>
+                <div className="border border-[#e2e0d8] rounded-2xl overflow-hidden bg-white shadow-sm p-1">
+                  <img 
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/id_card/${booking.imageId}`}
+                    alt="ID Card"
+                    className="w-full h-auto rounded-xl object-cover max-h-[200px]"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://placehold.co/400x200?text=Image+Access+Restricted';
+                    }}
+                  />
+                  <div className="px-2 py-1.5 text-[10px] text-[#8a8780] truncate text-center">
+                    ไฟล์: {booking.imageId}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Total Price */}
             <div className="bg-[#1a1916] rounded-2xl p-5 flex items-center justify-between text-white shadow-lg relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#c9440f] opacity-20 blur-[40px] rounded-full translate-x-10 -translate-y-10" />

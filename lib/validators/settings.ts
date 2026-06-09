@@ -1,3 +1,4 @@
+
 import type { SettingsUpdateInput } from '@/lib/types/settings';
 
 const asStringOrNull = (value: unknown): string | null => {
