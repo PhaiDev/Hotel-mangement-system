@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 
-// ---- SCHEMA ----
+// Re-defining interfaces here to ensure they match what we expect
 export interface Room {
   id: number;
   name: string;
@@ -29,129 +29,105 @@ export interface Booking {
   imageId?: string;
 }
 
-export interface Settings {
-  hotelName: string;
-  promptpay: string;
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, options);
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || json.message || 'API Request failed');
+  }
+  return json.data;
 }
-
 
 export const backend = {
   // ===== ROOMS =====
   getRooms: async (): Promise<Room[]> => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Room').select('*').order('id', { ascending: true });
-    if (error) throw new Error(error.message);
-    return data || [];
+    return apiFetch<Room[]>('/api/rooms');
   },
 
   createRoom: async (payload: Omit<Room, 'id' | 'createdAt'>): Promise<Room> => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Room').insert([payload]).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Room>('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   },
 
   updateRoom: async (id: number, payload: Partial<Omit<Room, 'id' | 'createdAt'>>): Promise<Room> => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Room').update(payload).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Room>(`/api/rooms/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   },
 
   deleteRoom: async (id: number): Promise<void> => {
-    const supabase = createClient();
-    const { error } = await supabase.from('Room').delete().eq('id', id);
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/rooms/${id}`, { method: 'DELETE' });
   },
 
   updateRoomActiveState: async (id: number, isActive: boolean): Promise<Room> => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Room').update({ isActive }).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Room>(`/api/rooms/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive }),
+    });
   },
 
   // ===== BOOKINGS =====
   getBookings: async (): Promise<Booking[]> => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Booking').select('*').order('createdAt', { ascending: false });
-    if (error) throw new Error(error.message);
-    return data || [];
+    return apiFetch<Booking[]>('/api/bookings');
   },
 
   checkBookingOverlap: async (roomId: number, checkIn: string, checkOut: string, excludeId?: number): Promise<boolean> => {
-    const supabase = createClient();
-    let query = supabase
-      .from('Booking')
-      .select('id')
-      .eq('roomId', roomId)
-      .neq('status', 'CANCELLED')
-      // Rule: (StartA < EndB) AND (EndA > StartB)
-      .lt('checkIn', checkOut)
-      .gt('checkOut', checkIn);
-
-    if (excludeId) {
-      query = query.neq('id', excludeId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return (data && data.length > 0) || false;
+    // We can still expose this if needed, but the server now handles it during create/update
+    // To implement this as an API, we'd need a dedicated endpoint or search params
+    const query = new URLSearchParams({
+      roomId: String(roomId),
+      checkIn,
+      checkOut,
+    });
+    if (excludeId) query.append('excludeId', String(excludeId));
+    
+    // For now, let's just use a simple check in the service if we really need it on the frontend
+    // but the actual validation is now on the server.
+    // If we want to keep the UI feedback, we can add a simple GET /api/bookings/check-overlap
+    return apiFetch<boolean>(`/api/bookings/check-overlap?${query.toString()}`);
   },
 
   createBooking: async (payload: Omit<Booking, 'id' | 'createdAt' | 'status'>): Promise<Booking> => {
-    const isOverlap = await backend.checkBookingOverlap(payload.roomId, payload.checkIn, payload.checkOut);
-    if (isOverlap) throw new Error('ห้องพักไม่ว่างในช่วงเวลาที่เลือก');
-
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Booking').insert([{
-      ...payload,
-      status: 'PENDING',
-    }]).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Booking>('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   },
 
   updateBooking: async (id: number, payload: Partial<Omit<Booking, 'id' | 'createdAt'>>): Promise<Booking> => {
-    const supabase = createClient();
-
-    // If dates or room are changing, check for overlap
-    if (payload.checkIn || payload.checkOut || payload.roomId) {
-      // Need current booking data if some fields are missing in payload
-      const { data: existing } = await supabase.from('Booking').select('*').eq('id', id).single();
-      if (existing) {
-        const rId = payload.roomId ?? existing.roomId;
-        const cIn = payload.checkIn ?? existing.checkIn;
-        const cOut = payload.checkOut ?? existing.checkOut;
-        const isOverlap = await backend.checkBookingOverlap(rId, cIn, cOut, id);
-        if (isOverlap) throw new Error('ไม่สามารถบันทึกได้ เนื่องจากห้องพักถูกจองแล้วในช่วงเวลาดังกล่าว');
-      }
-    }
-
-    const { data, error } = await supabase.from('Booking').update(payload).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Booking>(`/api/bookings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   },
 
   updateBookingStatus: async (id: number, status: BookingStatus, pinCode?: string): Promise<Booking> => {
-    const supabase = createClient();
     const updateData: { status: BookingStatus; pinCode?: string } = { status };
     if (pinCode !== undefined) updateData.pinCode = pinCode;
-    const { data, error } = await supabase.from('Booking').update(updateData).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Booking>(`/api/bookings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData),
+    });
   },
 
   deleteBooking: async (id: number): Promise<void> => {
-    const supabase = createClient();
-    const { error } = await supabase.from('Booking').delete().eq('id', id);
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/bookings/${id}`, { method: 'DELETE' });
   },
 
   updateBookingPin: async (id: number, pinCode: string): Promise<Booking> => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from('Booking').update({ pinCode }).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    return apiFetch<Booking>(`/api/bookings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinCode }),
+    });
   }
 };

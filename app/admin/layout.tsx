@@ -73,6 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dashboard', path: '/admin', icon: Grid },
     { name: 'รายการจอง', path: '/admin/bookings', icon: List },
     { name: 'จัดการห้อง', path: '/admin/rooms', icon: DoorOpen },
+    { name: 'ตารางงาน', path: '/admin/timeline', icon: List },
     { name: 'ปฏิทินห้องว่าง', path: '/admin/calendar', icon: CalendarDays },
     { name: 'วิเคราะห์ข้อมูล', path: '/admin/analysis', icon: LineChart },
     { name: 'ตั้งค่าระบบ', path: '/admin/settings', icon: Settings },
@@ -138,7 +139,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-[220px] min-w-0 flex flex-col min-h-screen">
+      <main className="flex-1 lg:ml-[220px] min-w-0 flex flex-col min-h-screen pb-20 lg:pb-0">
         <div className="bg-white border-b border-[#e2e0d8] px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
           <div className="flex items-center gap-3">
             <button
@@ -162,6 +163,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#1a1916] border-t border-white/10 px-2 py-1.5 pb-safe z-50 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+        {navItems.slice(0, 5).map((item) => {
+          const isActive = pathname === item.path;
+          const Icon = item.icon;
+          
+          // Custom labels for bottom nav
+          let label = item.name;
+          if (item.path === '/admin') label = 'Home';
+          if (item.path === '/admin/bookings') label = 'Bookings';
+          if (item.path === '/admin/rooms') label = 'Rooms';
+          if (item.path === '/admin/timeline') label = 'Timeline';
+          if (item.path === '/admin/calendar') label = 'Calendar';
+
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+                isActive ? 'text-[#c9440f]' : 'text-white/40'
+              }`}
+            >
+              <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <span className="text-[9px] font-bold uppercase tracking-[0.5px]">
+                {label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

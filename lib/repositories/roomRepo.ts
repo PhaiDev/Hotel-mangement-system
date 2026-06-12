@@ -5,7 +5,7 @@ export async function getAllRooms(): Promise<Room[]> {
   const { data, error } = await supabaseAdmin
     .from('Room')
     .select('*')
-    .order('id', { ascending: true });
+    //.order('id', { ascending: true });
 
   if (error) throw new Error(error.message);
   return data || [];

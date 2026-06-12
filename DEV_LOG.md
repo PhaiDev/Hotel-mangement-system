@@ -14,6 +14,7 @@
 - [x] **Settings Page (UI Layout)**: สร้างหน้า `/admin/settings` สำหรับให้ผู้บริหารตั้งค่าราคาโรงแรม, ภาษี, และ LINE Notify (ตอนนี้รันด้วย Mock Data เพื่อรอเชื่อมต่อ DB)
 - [x] **Check-in / Check-out Action Buttons**: สร้างปุ่ม Quick Action ในหน้า Bookings Card ให้พนักงานกด รับชำระเงิน/เช็คอิน/เช็คเอาท์ ได้ในคลิกเดียว (Smart State Button)
 - [x] **Smart Conflict Detection**: อัปเกรด `<BookingModal />` ให้สามารถเช็คห้องว่างได้แบบ Real-time ป้องกันการจองซ้อนทับกัน (Disable ห้องที่เต็มแล้ว)
+- [x] **Architecture Refactor (API Routes)**: ย้ายการเชื่อมต่อฐานข้อมูลจาก Frontend ไปอยู่ที่ Next.js API Routes (Repository -> Service -> API Route pattern) เพื่อความปลอดภัยและความยืดหยุ่นของระบบ
 
 ---
 
