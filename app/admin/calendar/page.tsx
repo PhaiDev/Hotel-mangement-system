@@ -6,7 +6,6 @@ import { SwalStyled, swalCSS } from '@/lib/swalTheme';
 import { ChevronLeft, ChevronRight, Users, RefreshCw, CalendarPlus } from 'lucide-react';
 import useSWR from 'swr';
 import BookingModal from '@/components/BookingModal';
-import { mockRooms } from '@/lib/mock/rooms';
 
 const THAI_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -26,20 +25,7 @@ export default function CalendarPage() {
   const { data: rooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
   const { data: bookings = [], mutate: mutateBookings, isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
   const loading = loadingRooms || loadingBookings;
-  const effectiveRooms = useMemo(() => {
-    if (rooms.length > 0) return rooms;
-    return mockRooms.map((room) => ({
-      id: room.id,
-      name: `ห้อง ${room.roomNumber}`,
-      lockId: `MOCK-${room.roomNumber}`,
-      isActive: room.isActive,
-      price: room.price,
-      capacity: room.maxGuests,
-      createdAt: new Date().toISOString(),
-      pinLock: '',
-      imageUrl: room.imageUrl,
-    }));
-  }, [rooms]);
+  const effectiveRooms = rooms;
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());

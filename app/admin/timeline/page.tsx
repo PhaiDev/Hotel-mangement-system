@@ -4,7 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { Room, Booking } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { mockRooms } from '@/lib/mock/rooms';
+import useSWR from 'swr';
+import { backend } from '@/lib/supabase';
 import BookingDetailModal from '@/components/BookingDetailModal';
 
 const THAI_MONTHS = [
@@ -12,70 +13,23 @@ const THAI_MONTHS = [
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ];
 
-// Create Mock Bookings for demonstration
-const mockBookings: Booking[] = [
-  {
-    id: 1,
-    customerName: 'สมชาย ใจดี',
-    customerLine: 'somchai_line',
-    roomId: 1,
-    checkIn: '2026-06-02T00:00:00Z',
-    checkOut: '2026-06-23T00:00:00Z',
-    status: 'PENDING',
-    totalPrice: 25200,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    customerName: 'John Doe',
-    customerLine: '@john_doe',
-    roomId: 3,
-    checkIn: '2026-06-07T00:00:00Z',
-    checkOut: '2026-06-21T00:00:00Z',
-    status: 'PAID',
-    totalPrice: 25200,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    customerName: 'Jane Smith',
-    customerLine: 'jane_s',
-    roomId: 4,
-    checkIn: '2026-06-06T00:00:00Z',
-    checkOut: '2026-06-14T00:00:00Z',
-    status: 'ACTIVE',
-    totalPrice: 14400,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 4,
-    customerName: 'วิชัย รักชาติ',
-    customerLine: '0812345678',
-    roomId: 6,
-    checkIn: '2026-06-04T00:00:00Z',
-    checkOut: '2026-06-18T00:00:00Z',
-    status: 'COMPLETED',
-    totalPrice: 42000,
-    createdAt: new Date().toISOString(),
-  }
-];
-
 export default function TimelinePage() {
-  // Use mock data
-  const rooms = useMemo(() => mockRooms.map(r => ({
-    id: r.id,
-    name: `ห้อง ${r.roomNumber}`,
-    lockId: `LOCK-${r.roomNumber}`,
-    isActive: r.isActive,
-    price: r.price,
-    capacity: r.maxGuests,
-    createdAt: new Date().toISOString(),
-    pinLock: '1234',
-  })), []);
-
-  const bookings = useMemo(() => mockBookings, []);
+  const { data: rooms = [], isLoading: loadingRooms } = useSWR('rooms', backend.getRooms, { revalidateOnFocus: true });
+  const { data: bookings = [], isLoading: loadingBookings } = useSWR('bookings', backend.getBookings, { revalidateOnFocus: true });
+  const loading = loadingRooms || loadingBookings;
 
   const today = new Date();
+
+  if (loading && rooms.length === 0 && bookings.length === 0) {
+    return (
+      <div className="py-20 flex justify-center text-[#8a8780]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[13px] font-mono">กำลังโหลดข้อมูล...</span>
+        </div>
+      </div>
+    );
+  }
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
 

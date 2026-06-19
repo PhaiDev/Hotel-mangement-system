@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runBackup } from '@/lib/services/backupService';
+import { DriveBackup } from '@/lib/services/backupService';
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -13,10 +13,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await runBackup();
-    return NextResponse.json({ 
-      message: 'Backup completed successfully',
-      ...result 
+    const result = await DriveBackup();
+
+    if (!result?.success) {
+      console.error('API Backup Error:', result);
+      return NextResponse.json(
+        {
+          error: 'Backup failed',
+          ...result,
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      messages : 'Backup completed successfully',
+      ...result,
     });
   } catch (error) {
     console.error('API Backup Error:', error);
