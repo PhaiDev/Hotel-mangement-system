@@ -12,7 +12,7 @@ export async function logAction(data: {
   try {
     await createAuditLog({
       userId: data.userId || null,
-      userEmail: 'test',
+      userEmail: data.userEmail || null,
       action: data.action,
       targetId: data.targetId || null,
       details: data.details || null,
