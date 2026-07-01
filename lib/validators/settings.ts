@@ -41,7 +41,8 @@ export function validateAndNormalizeSettings(payload: unknown): SettingsUpdateIn
     vatPercent,
     priceDaily,
     priceTemporary,
-    lineNotifyToken: asStringOrNull(body.lineNotifyToken),
+    lineOaChannelAccessToken: asStringOrNull(body.lineOaChannelAccessToken),
+    lineOaRecipientId: asStringOrNull(body.lineOaRecipientId),
     allowOverbooking: Boolean(body.allowOverbooking),
   };
 }

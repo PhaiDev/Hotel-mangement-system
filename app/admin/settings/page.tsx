@@ -14,7 +14,8 @@ const DEFAULT_SETTINGS = {
   vatPercent: 7,
   priceDaily: 500,
   priceTemporary: 300,
-  lineNotifyToken: '',
+  lineOaChannelAccessToken: '',
+  lineOaRecipientId: '',
   allowOverbooking: false,
 };
 
@@ -40,7 +41,8 @@ export default function SettingsPage() {
           vatPercent: Number(json.data.vatPercent ?? DEFAULT_SETTINGS.vatPercent),
           priceDaily: Number(json.data.priceDaily ?? DEFAULT_SETTINGS.priceDaily),
           priceTemporary: Number(json.data.priceTemporary ?? DEFAULT_SETTINGS.priceTemporary),
-          lineNotifyToken: json.data.lineNotifyToken ?? '',
+          lineOaChannelAccessToken: json.data.lineOaChannelAccessToken ?? '',
+          lineOaRecipientId: json.data.lineOaRecipientId ?? '',
           allowOverbooking: Boolean(json.data.allowOverbooking),
         });
       }
@@ -76,7 +78,8 @@ export default function SettingsPage() {
           vatPercent: Number(json.data.vatPercent ?? DEFAULT_SETTINGS.vatPercent),
           priceDaily: Number(json.data.priceDaily ?? DEFAULT_SETTINGS.priceDaily),
           priceTemporary: Number(json.data.priceTemporary ?? DEFAULT_SETTINGS.priceTemporary),
-          lineNotifyToken: json.data.lineNotifyToken ?? '',
+          lineOaChannelAccessToken: json.data.lineOaChannelAccessToken ?? '',
+          lineOaRecipientId: json.data.lineOaRecipientId ?? '',
           allowOverbooking: Boolean(json.data.allowOverbooking),
         });
       }
@@ -290,17 +293,26 @@ export default function SettingsPage() {
                     <svg viewBox="0 0 24 24" fill="#00B900" className="w-6 h-6"><path d="M21.4 10.3c0-4.5-4.4-8.2-9.9-8.2-5.5 0-9.9 3.7-9.9 8.2 0 4 3.5 7.4 8.2 8.1.3.1.8.3.9.7l.3 1.9c.1.4.3.5.7.3 1.5-.9 5.4-3.3 7.5-6.1 1.4-1.6 2.2-3.3 2.2-4.9zm-13.8 1.9c-.3 0-.6-.3-.6-.6V8.5c0-.3.3-.6.6-.6h3.4c.3 0 .6.3.6.6v.6c0 .3-.3.6-.6.6H8.8v.6h2.2c.3 0 .6.3.6.6v.6c0 .3-.3.6-.6.6H8.2v.7c0 .3-.3.6-.6.6h-.1zm5.1 0c-.3 0-.6-.3-.6-.6V8.5c0-.3.3-.6.6-.6s.6.3.6.6v3.1c0 .3-.3.6-.6.6h-.1zm4.7 0c-.3 0-.6-.3-.6-.6v-2h-1l-1.6 2.2c-.1.2-.3.3-.5.3h-.1c-.3 0-.6-.3-.6-.6V8.5c0-.3.3-.6.6-.6s.6.3.6.6v2l1.6-2.2c.1-.2.3-.3.5-.3h.1c.3 0 .6.3.6.6v3.1c0 .3-.3.6-.6.6h.1z" /></svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-[13px] font-bold text-[#1a1916] mb-1">LINE Notify Token</div>
-                    <div className="text-[11px] text-[#8a8780] mb-3">เมื่อมีการจองใหม่ หรือรับชำระเงินสำเร็จ ระบบจะส่งข้อความแจ้งเตือนไปยังกลุ่ม LINE ของพนักงานอัตโนมัติ</div>
+                    <div className="text-[13px] font-bold text-[#1a1916] mb-1">LINE Official Account</div>
+                    <div className="text-[11px] text-[#8a8780] mb-3">ใช้ Messaging API ของ LINE OA เพื่อส่งข้อความแจ้งเตือนไปยังผู้ใช้ กลุ่ม หรือห้องแชทของพนักงาน</div>
+                    <label className="block text-[11px] font-bold text-[#8a8780] uppercase mb-1.5">Channel Access Token</label>
                     <input
                       type="password"
-                      value={formData.lineNotifyToken}
-                      onChange={(e) => setFormData({ ...formData, lineNotifyToken: e.target.value })}
-                      placeholder="ใส่ Token ที่ได้จาก LINE Notify..."
+                      value={formData.lineOaChannelAccessToken}
+                      onChange={(e) => setFormData({ ...formData, lineOaChannelAccessToken: e.target.value })}
+                      placeholder="ใส่ Channel access token จาก LINE Developers..."
+                      className="w-full px-4 py-2.5 rounded-xl border border-[#d0cdc2] bg-white outline-none focus:border-[#00B900] text-[13px] font-mono tracking-wider"
+                    />
+                    <label className="block text-[11px] font-bold text-[#8a8780] uppercase mt-4 mb-1.5">Recipient ID</label>
+                    <input
+                      type="text"
+                      value={formData.lineOaRecipientId}
+                      onChange={(e) => setFormData({ ...formData, lineOaRecipientId: e.target.value })}
+                      placeholder="User ID, Group ID หรือ Room ID"
                       className="w-full px-4 py-2.5 rounded-xl border border-[#d0cdc2] bg-white outline-none focus:border-[#00B900] text-[13px] font-mono tracking-wider"
                     />
                     <div className="mt-2 text-[10px] text-[#8a8780] flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-[#1a7a4a]" /> สถานะ: พร้อมใช้งาน (ทดสอบเชื่อมต่อสำเร็จ)
+                      <CheckCircle2 className="w-3 h-3 text-[#1a7a4a]" /> ต้องเพิ่ม LINE OA เข้ากลุ่มก่อนจึงจะส่งเข้ากลุ่มได้
                     </div>
                   </div>
                 </div>

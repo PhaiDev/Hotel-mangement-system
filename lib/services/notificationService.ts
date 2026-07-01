@@ -1,40 +1,53 @@
 import { getSettings } from '../repositories/settingsRepo';
 
-export async function sendLineNotify(message: string, token?: string | null) {
-  let notifyToken = token;
+type LineOaOptions = {
+  channelAccessToken?: string | null;
+  recipientId?: string | null;
+};
 
-  if (!notifyToken) {
+export async function sendLineOaMessage(message: string, options: LineOaOptions = {}) {
+  let channelAccessToken = options.channelAccessToken;
+  let recipientId = options.recipientId;
+
+  if (!channelAccessToken || !recipientId) {
     try {
       const settings = await getSettings();
-      notifyToken = settings.lineNotifyToken;
+      channelAccessToken = channelAccessToken || settings.lineOaChannelAccessToken;
+      recipientId = recipientId || settings.lineOaRecipientId;
     } catch (error) {
-      console.error('Error fetching settings for LINE Notify:', error);
+      console.error('Error fetching settings for LINE OA:', error);
       return;
     }
   }
 
-  if (!notifyToken) {
-    console.warn('LINE Notify token is not set');
+  if (!channelAccessToken) {
+    console.warn('LINE OA channel access token is not set');
+    return;
+  }
+
+  if (!recipientId) {
+    console.warn('LINE OA recipient ID is not set');
     return;
   }
 
   try {
-    const response = await fetch('https://notify-api.line.me/api/notify', {
+    const response = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Bearer ${notifyToken}`,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${channelAccessToken}`,
       },
-      body: new URLSearchParams({
-        message: message,
+      body: JSON.stringify({
+        to: recipientId,
+        messages: [{ type: 'text', text: message }],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('LINE Notify API error:', errorText);
+      console.error('LINE OA Messaging API error:', errorText);
     }
   } catch (error) {
-    console.error('Error sending LINE Notify:', error);
+    console.error('Error sending LINE OA message:', error);
   }
 }

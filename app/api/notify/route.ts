@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendLineNotify } from "@/lib/services/notificationService";
+import { sendLineOaMessage } from "@/lib/services/notificationService";
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { message } = body;
+        const { message, to } = body;
 
         if (!message) {
             return NextResponse.json({ error: "Message is required" }, { status: 400 });
         }
 
-        await sendLineNotify(message);
+        await sendLineOaMessage(message, { recipientId: to });
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
         console.error("Notify API Error:", error);

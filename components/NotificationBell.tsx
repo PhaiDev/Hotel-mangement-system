@@ -40,7 +40,7 @@ export default function NotificationBell() {
     return false;
   }).sort((a, b) => new Date(b.checkIn).getTime() - new Date(a.checkIn).getTime());
 
-  // Handle LINE Notify
+  // Handle LINE OA notification
   useEffect(() => {
     const checkAndNotify = async () => {
       const now = Date.now();
@@ -70,7 +70,7 @@ export default function NotificationBell() {
               newNotified[key] = now;
               updated = true;
             } catch (err) {
-              console.error('Failed to send LINE notify:', err);
+              console.error('Failed to send LINE OA notification:', err);
             }
           }
         }

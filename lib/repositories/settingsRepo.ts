@@ -12,7 +12,8 @@ const defaultSettings = {
   vatPercent: 7,
   priceDaily: 500,
   priceTemporary: 300,
-  lineNotifyToken: null,
+  lineOaChannelAccessToken: null,
+  lineOaRecipientId: null,
   allowOverbooking: false,
 };
 

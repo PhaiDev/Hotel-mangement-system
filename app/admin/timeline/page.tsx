@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Room, Booking } from '@/lib/supabase';
+import { Booking } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useSWR from 'swr';
@@ -20,16 +20,6 @@ export default function TimelinePage() {
 
   const today = new Date();
 
-  if (loading && rooms.length === 0 && bookings.length === 0) {
-    return (
-      <div className="py-20 flex justify-center text-[#8a8780]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[13px] font-mono">กำลังโหลดข้อมูล...</span>
-        </div>
-      </div>
-    );
-  }
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
 
@@ -42,6 +32,17 @@ export default function TimelinePage() {
     const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
     return Array.from({ length: lastDay }, (_, i) => i + 1);
   }, [currentYear, currentMonth]);
+
+  if (loading && rooms.length === 0 && bookings.length === 0) {
+    return (
+      <div className="py-20 flex justify-center text-[#8a8780]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#c9440f] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[13px] font-mono">กำลังโหลดข้อมูล...</span>
+        </div>
+      </div>
+    );
+  }
 
   const navigateMonth = (direction: number) => {
     let newMonth = currentMonth + direction;

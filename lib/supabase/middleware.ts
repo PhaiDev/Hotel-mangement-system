@@ -42,15 +42,15 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/admin/login';
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), user };
   }
 
   // If user is logged in and visits /admin/login, redirect to /admin
   if (user && request.nextUrl.pathname.startsWith('/admin/login')) {
     const url = request.nextUrl.clone();
     url.pathname = '/admin';
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), user };
   }
 
-  return supabaseResponse;
+  return { response: supabaseResponse, user };
 }

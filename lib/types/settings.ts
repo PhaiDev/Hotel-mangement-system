@@ -8,7 +8,8 @@ export interface SystemSettings {
   vatPercent: number;
   priceDaily: number;
   priceTemporary: number;
-  lineNotifyToken: string | null;
+  lineOaChannelAccessToken: string | null;
+  lineOaRecipientId: string | null;
   allowOverbooking: boolean;
   createdAt: string;
   updatedAt: string;

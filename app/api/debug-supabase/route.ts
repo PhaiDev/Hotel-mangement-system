@@ -11,6 +11,7 @@ export async function GET() {
     // 2. Try raw query to check tables
     const { data: rooms, error: roomError } = await supabaseAdmin.from('Room').select('count', { count: 'exact', head: true });
     const { data: bookings, error: bookingError } = await supabaseAdmin.from('Booking').select('count', { count: 'exact', head: true });
+    const { data: auditLogs, error: auditLogError } = await supabaseAdmin.from('AuditLogs').select('count', { count: 'exact', head: true });
 
     return NextResponse.json({
       config: {
@@ -28,6 +29,11 @@ export async function GET() {
           success: !bookingError,
           error: bookingError ? bookingError.message : null,
           count: bookings
+        },
+        auditLogsTable: {
+          success: !auditLogError,
+          error: auditLogError ? auditLogError.message : null,
+          count: auditLogs
         }
       }
     });

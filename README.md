@@ -190,7 +190,8 @@ CREATE TABLE IF NOT EXISTS "SystemSettings" (
   "vatPercent" NUMERIC(5,2) NOT NULL DEFAULT 7.00 CHECK ("vatPercent" >= 0),
   "priceDaily" INTEGER NOT NULL DEFAULT 500 CHECK ("priceDaily" >= 0),
   "priceTemporary" INTEGER NOT NULL DEFAULT 300 CHECK ("priceTemporary" >= 0),
-  "lineNotifyToken" TEXT,
+  "lineOaChannelAccessToken" TEXT,
+  "lineOaRecipientId" TEXT,
   "allowOverbooking" BOOLEAN NOT NULL DEFAULT false,
   "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -202,6 +203,14 @@ CREATE TABLE IF NOT EXISTS "SystemSettings" (
 ```sql
 CREATE UNIQUE INDEX IF NOT EXISTS "SystemSettings_single_row_idx"
 ON "SystemSettings" ((true));
+```
+
+ถ้าโปรเจกต์มีตาราง `SystemSettings` อยู่แล้วและยังใช้ LINE Notify เดิม ให้เพิ่มคอลัมน์สำหรับ LINE OA:
+
+```sql
+ALTER TABLE "SystemSettings"
+ADD COLUMN IF NOT EXISTS "lineOaChannelAccessToken" TEXT,
+ADD COLUMN IF NOT EXISTS "lineOaRecipientId" TEXT;
 ```
 
 ## Supabase Storage Plan
@@ -315,4 +324,3 @@ POST   /api/uploads/id-card
 ## Known Build Note
 
 ถ้า `npm run build` ล้มเหลวเพราะโหลด Google Fonts ไม่ได้ ให้ตรวจ network หรือเปลี่ยน font เป็น local/self-hosted font เพราะ `next/font/google` ต้องเข้าถึง Google Fonts ระหว่าง build
-
