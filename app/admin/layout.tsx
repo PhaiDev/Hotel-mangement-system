@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { Grid, List, DoorOpen, LineChart, LogOut, Menu, X, User, CalendarDays, Settings } from 'lucide-react';
+import { Grid, List, DoorOpen, LineChart, LogOut, Menu, X, User, CalendarDays, Settings, Clock3, Upload } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -73,9 +73,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dashboard', path: '/admin', icon: Grid },
     { name: 'รายการจอง', path: '/admin/bookings', icon: List },
     { name: 'จัดการห้อง', path: '/admin/rooms', icon: DoorOpen },
-    { name: 'ตารางงาน', path: '/admin/timeline', icon: List },
+    { name: 'ตารางงาน', path: '/admin/timeline', icon: Clock3 },
     { name: 'ปฏิทินห้องว่าง', path: '/admin/calendar', icon: CalendarDays },
     { name: 'วิเคราะห์ข้อมูล', path: '/admin/analysis', icon: LineChart },
+    { name: 'นำเข้าข้อมูล', path: '/admin/import', icon: Upload },
     { name: 'ตั้งค่าระบบ', path: '/admin/settings', icon: Settings },
     { name: 'Profile', path: '/admin/profile', icon: User },
   ];
